@@ -46,25 +46,34 @@ function limb(size, color) {
   return mesh;
 }
 
+const TEAM_PALETTES = {
+  alpha: { torso: '#3b74a5', arms: '#2c5a82' },
+  beta: { torso: '#a94d47', arms: '#853835' },
+};
+
 export class BotCharacter {
-  constructor(x, z) {
+  constructor(x, z, team = 'beta') {
     this.group = new THREE.Group();
     this.group.position.set(x, 0, z);
     this.group.userData.kind = 'bot';
+    this.group.userData.team = team;
+    this.team = team;
 
     this.speed = 2.2;
     this.hp = 100;
     this.attackCooldown = 0;
     this.walkPhase = Math.random() * Math.PI * 2;
 
-    const torso = limb({ x: 0.54, y: 0.62, z: 0.28 }, '#4e708f');
+    const palette = TEAM_PALETTES[team] ?? TEAM_PALETTES.beta;
+
+    const torso = limb({ x: 0.54, y: 0.62, z: 0.28 }, palette.torso);
     torso.position.y = 1.42;
     const head = limb({ x: 0.34, y: 0.34, z: 0.34 }, '#e7b99a');
     head.position.y = 1.93;
 
-    this.leftArm = limb({ x: 0.14, y: 0.54, z: 0.16 }, '#35526d');
+    this.leftArm = limb({ x: 0.14, y: 0.54, z: 0.16 }, palette.arms);
     this.leftArm.position.set(-0.36, 1.42, 0);
-    this.rightArm = limb({ x: 0.14, y: 0.54, z: 0.16 }, '#35526d');
+    this.rightArm = limb({ x: 0.14, y: 0.54, z: 0.16 }, palette.arms);
     this.rightArm.position.set(0.36, 1.42, 0);
 
     this.leftLeg = limb({ x: 0.17, y: 0.62, z: 0.2 }, '#28313a');

@@ -15,11 +15,15 @@ const menu = document.getElementById('menu');
 const gameWrap = document.getElementById('gameWrap');
 const canvas = document.getElementById('gameCanvas');
 let game;
-const selectedMap = MAPS[0]?.id ?? 0;
+let selectedMapIndex = 0;
 
 function startMatch() {
   menu.classList.add('hidden');
   gameWrap.classList.remove('hidden');
+
+  const selectedMap = MAPS[selectedMapIndex % MAPS.length]?.id ?? 0;
+  selectedMapIndex = (selectedMapIndex + 1) % MAPS.length;
+
   game = new Game(canvas, hud, selectedMap);
   game.start();
 }

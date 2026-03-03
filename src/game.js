@@ -4,6 +4,7 @@ import { BotCharacter, WeaponState } from './entities.js';
 
 const PLAYER_RADIUS = 0.28;
 const PLAYER_HEIGHT = 1.7;
+const BOT_RADIUS = 0.3;
 
 function clamp(v, lo, hi) {
   return Math.min(hi, Math.max(lo, v));
@@ -23,6 +24,9 @@ export class Game {
     this.score = 0;
     this.hp = 100;
     this.roundTime = 240;
+    this.team = 'alpha';
+    this.teamScores = { alpha: 0, beta: 0 };
+    this.scoreLimit = this.map.scoreLimit ?? 40;
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -134,18 +138,32 @@ export class Game {
   }
 
   spawnPlayer() {
-    this.playerPos = new THREE.Vector3(this.map.playerSpawn.x, 0, this.map.playerSpawn.y);
+    const safeSpawn = this.findSafeSpawn(this.map.playerSpawn);
+    this.playerPos = new THREE.Vector3(safeSpawn.x, 0, safeSpawn.y);
     this.cameraRig.position.copy(this.playerPos);
     this.cameraRig.rotation.y = this.map.playerSpawn.dir;
     this.pitchPivot.rotation.x = 0;
   }
 
   spawnBots() {
-    this.bots = this.map.botSpawns.map((s) => {
-      const bot = new BotCharacter(s.x, s.y);
+    const makeTeam = (team) => (this.map.teamSpawns?.[team] ?? []).map((s) => {
+      const safe = this.findSafeSpawn(s);
+      const bot = new BotCharacter(safe.x, safe.y, team);
       this.scene.add(bot.group);
       return bot;
     });
+
+    this.bots = [...makeTeam('alpha'), ...makeTeam('beta')];
+  }
+
+  findSafeSpawn(spawn) {
+    const checks = [[0, 0], [0.6, 0], [-0.6, 0], [0, 0.6], [0, -0.6], [0.6, 0.6], [-0.6, -0.6], [0.6, -0.6], [-0.6, 0.6]];
+    for (const [dx, dy] of checks) {
+      const x = spawn.x + dx;
+      const y = spawn.y + dy;
+      if (wallAt(this.map, x, y) === '0' && this.positionHasClearance(x, y, PLAYER_RADIUS + 0.04)) return { x, y };
+    }
+    return { x: spawn.x, y: spawn.y };
   }
 
   buildViewModel() {
@@ -263,7 +281,7 @@ export class Game {
     this.updateBots(dt);
     this.animateViewModel();
 
-    if (this.hp <= 0 || this.roundTime <= 0 || this.bots.every((b) => !b.alive)) this.resetRound();
+    if (this.hp <= 0 || this.roundTime <= 0 || this.teamScores.alpha >= this.scoreLimit || this.teamScores.beta >= this.scoreLimit) this.resetRound();
     this.updateHud();
   }
 
@@ -300,13 +318,18 @@ export class Game {
 
   tryMove(nx, nz) {
     if (wallAt(this.map, nx, nz) !== '0') return;
-    for (const box of this.wallBoxes) {
-      const nearestX = clamp(nx, box.min.x, box.max.x);
-      const nearestZ = clamp(nz, box.min.z, box.max.z);
-      if (Math.hypot(nx - nearestX, nz - nearestZ) < PLAYER_RADIUS + 0.02) return;
-    }
+    if (!this.positionHasClearance(nx, nz, PLAYER_RADIUS + 0.02)) return;
     this.playerPos.x = nx;
     this.playerPos.z = nz;
+  }
+
+  positionHasClearance(x, z, radius) {
+    for (const box of this.wallBoxes) {
+      const nearestX = clamp(x, box.min.x, box.max.x);
+      const nearestZ = clamp(z, box.min.z, box.max.z);
+      if (Math.hypot(x - nearestX, z - nearestZ) < radius) return false;
+    }
+    return true;
   }
 
   fireWeapon() {
@@ -322,7 +345,7 @@ export class Game {
     this.raycaster.set(this.camera.getWorldPosition(new THREE.Vector3()), dir);
     this.raycaster.far = this.weapon.def.range;
 
-    const targets = this.bots.filter((b) => b.alive).map((b) => b.group);
+    const targets = this.bots.filter((b) => b.alive && b.team !== this.team).map((b) => b.group);
     const hits = this.raycaster.intersectObjects(targets, true);
     if (hits.length > 0) {
       const root = hits[0].object.parent;
@@ -331,7 +354,9 @@ export class Game {
         bot.hp = Math.max(0, bot.hp - this.weapon.def.damage);
         if (!bot.alive) {
           this.score += 1;
+          this.teamScores.alpha += 1;
           bot.group.visible = false;
+          this.respawnBot(bot);
         }
       }
     }
@@ -341,35 +366,78 @@ export class Game {
     for (const bot of this.bots) {
       if (!bot.alive) continue;
       const botPos = bot.group.position;
-      const d = dist2d(botPos.x, botPos.z, this.playerPos.x, this.playerPos.z);
+      const target = this.getBotTarget(bot);
+      if (!target) continue;
+      const d = dist2d(botPos.x, botPos.z, target.x, target.z);
       bot.attackCooldown = Math.max(0, bot.attackCooldown - dt);
 
       if (d < 24) {
-        const targetAngle = Math.atan2(this.playerPos.x - botPos.x, this.playerPos.z - botPos.z);
+        const targetAngle = Math.atan2(target.x - botPos.x, target.z - botPos.z);
         bot.group.rotation.y = targetAngle;
 
         const moveStep = clamp(d - 1.8, 0, bot.speed * dt);
         const nx = botPos.x + Math.sin(targetAngle) * moveStep;
         const nz = botPos.z + Math.cos(targetAngle) * moveStep;
-        if (wallAt(this.map, nx, nz) === '0') {
+        if (wallAt(this.map, nx, nz) === '0' && this.positionHasClearance(nx, nz, BOT_RADIUS)) {
           botPos.x = nx;
           botPos.z = nz;
         }
         bot.animateWalk(performance.now() * 0.001, moveStep > 0 ? 1 : 0.2);
 
-        if (d < 8 && bot.attackCooldown === 0 && this.canSeePlayer(botPos)) {
-          this.hp = Math.max(0, this.hp - 8);
-          this.damageFlash = 1;
+        if (d < 9 && bot.attackCooldown === 0 && this.canSeeTarget(botPos, target)) {
+          this.applyDamage(target, 8);
           bot.attackCooldown = 0.5 + Math.random() * 0.55;
         }
       }
     }
   }
 
-  canSeePlayer(botPos) {
-    const dir = new THREE.Vector3(this.playerPos.x - botPos.x, PLAYER_HEIGHT - 1.4, this.playerPos.z - botPos.z).normalize();
+  getBotTarget(bot) {
+    const opponents = [];
+    if (bot.team !== this.team && this.hp > 0) {
+      opponents.push({ type: 'player', x: this.playerPos.x, z: this.playerPos.z });
+    }
+
+    for (const other of this.bots) {
+      if (!other.alive || other === bot || other.team === bot.team) continue;
+      opponents.push({ type: 'bot', bot: other, x: other.group.position.x, z: other.group.position.z });
+    }
+
+    if (opponents.length === 0) return null;
+
+    opponents.sort((a, b) => dist2d(bot.group.position.x, bot.group.position.z, a.x, a.z) - dist2d(bot.group.position.x, bot.group.position.z, b.x, b.z));
+    return opponents[0];
+  }
+
+  applyDamage(target, damage) {
+    if (target.type === 'player') {
+      this.hp = Math.max(0, this.hp - damage);
+      this.damageFlash = 1;
+      return;
+    }
+
+    target.bot.hp = Math.max(0, target.bot.hp - damage);
+    if (!target.bot.alive) {
+      this.teamScores[target.bot.team === 'alpha' ? 'beta' : 'alpha'] += 1;
+      target.bot.group.visible = false;
+      this.respawnBot(target.bot);
+    }
+  }
+
+  respawnBot(bot) {
+    const candidates = this.map.teamSpawns?.[bot.team] ?? [];
+    const spawn = candidates[Math.floor(Math.random() * candidates.length)] ?? this.map.playerSpawn;
+    const safe = this.findSafeSpawn(spawn);
+    bot.hp = 100;
+    bot.group.position.set(safe.x, 0, safe.y);
+    bot.group.visible = true;
+  }
+
+  canSeeTarget(botPos, target) {
+    const targetY = target.type === 'player' ? PLAYER_HEIGHT : 1.4;
+    const dir = new THREE.Vector3(target.x - botPos.x, targetY - 1.4, target.z - botPos.z).normalize();
     this.raycaster.set(new THREE.Vector3(botPos.x, 1.4, botPos.z), dir);
-    this.raycaster.far = dist2d(botPos.x, botPos.z, this.playerPos.x, this.playerPos.z);
+    this.raycaster.far = dist2d(botPos.x, botPos.z, target.x, target.z);
     const hits = this.raycaster.intersectObjects(this.worldBlocks, false);
     return hits.length === 0;
   }
@@ -391,6 +459,7 @@ export class Game {
     this.hp = 100;
     this.score = 0;
     this.roundTime = 240;
+    this.teamScores = { alpha: 0, beta: 0 };
     this.weapon = new WeaponState(WEAPONS[this.weaponIndex]);
     this.spawnPlayer();
     for (const bot of this.bots) this.scene.remove(bot.group);
@@ -401,11 +470,15 @@ export class Game {
     this.hud.weapon.textContent = `${this.weapon.def.name} (${this.weapon.def.era})`;
     this.hud.ammo.textContent = `${this.weapon.mag}/${this.weapon.reserve}`;
     this.hud.hp.textContent = String(Math.ceil(this.hp));
-    this.hud.kills.textContent = String(this.score);
-    this.hud.enemies.textContent = String(this.bots.filter((b) => b.alive).length);
+    this.hud.kills.textContent = `${this.teamScores.alpha}`;
+    this.hud.enemies.textContent = `${this.teamScores.beta}`;
     const mins = String(Math.floor(this.roundTime / 60)).padStart(2, '0');
     const secs = String(Math.floor(this.roundTime % 60)).padStart(2, '0');
     this.hud.timer.textContent = `${mins}:${secs}`;
-    this.hud.status.textContent = this.weapon.reloadLeft > 0 ? `Reloading ${this.weapon.reloadLeft.toFixed(1)}s` : 'Engaged';
+    if (this.weapon.reloadLeft > 0) {
+      this.hud.status.textContent = `Reloading ${this.weapon.reloadLeft.toFixed(1)}s`;
+    } else {
+      this.hud.status.textContent = `${this.map.name} • TDM ${this.teamScores.alpha}-${this.teamScores.beta} / ${this.scoreLimit}`;
+    }
   }
 }
