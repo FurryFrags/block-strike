@@ -197,46 +197,110 @@ export class Game {
     }, 1800);
   }
 
+  drawFloor(ctx) {
+    const sky = ctx.createLinearGradient(0, 0, 0, HEIGHT * 0.45);
+    sky.addColorStop(0, '#1a2638');
+    sky.addColorStop(1, this.map.palette.floor);
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    const horizonY = HEIGHT * 0.32;
+    ctx.strokeStyle = 'rgba(200, 220, 255, 0.12)';
+    for (let y = horizonY; y < HEIGHT; y += 36) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(WIDTH, y);
+      ctx.stroke();
+    }
+    for (let x = 0; x <= WIDTH; x += 80) {
+      ctx.beginPath();
+      ctx.moveTo(x, HEIGHT);
+      ctx.lineTo(WIDTH / 2, horizonY);
+      ctx.stroke();
+    }
+  }
+
+  drawObstacle3D(ctx, o) {
+    const depthX = 18;
+    const depthY = 14;
+    ctx.fillStyle = this.map.palette.wall;
+    ctx.fillRect(o.x, o.y, o.w, o.h);
+
+    ctx.beginPath();
+    ctx.moveTo(o.x, o.y);
+    ctx.lineTo(o.x + depthX, o.y - depthY);
+    ctx.lineTo(o.x + o.w + depthX, o.y - depthY);
+    ctx.lineTo(o.x + o.w, o.y);
+    ctx.closePath();
+    ctx.fillStyle = this.map.palette.cover;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(o.x + o.w, o.y);
+    ctx.lineTo(o.x + o.w + depthX, o.y - depthY);
+    ctx.lineTo(o.x + o.w + depthX, o.y + o.h - depthY);
+    ctx.lineTo(o.x + o.w, o.y + o.h);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+    ctx.fill();
+  }
+
+  drawAgent(ctx, entity, baseColor) {
+    const shadowW = entity.radius * 2.2;
+    const shadowH = entity.radius * 1.05;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.beginPath();
+    ctx.ellipse(entity.x + 6, entity.y + entity.radius * 0.65, shadowW, shadowH, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    const body = ctx.createRadialGradient(
+      entity.x - entity.radius * 0.4,
+      entity.y - entity.radius * 0.6,
+      entity.radius * 0.2,
+      entity.x,
+      entity.y,
+      entity.radius * 1.2,
+    );
+    body.addColorStop(0, '#ffffff');
+    body.addColorStop(0.14, baseColor);
+    body.addColorStop(1, 'rgba(0, 0, 0, 0.85)');
+    ctx.fillStyle = body;
+    ctx.beginPath();
+    ctx.arc(entity.x, entity.y, entity.radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   draw() {
     const ctx = this.ctx;
     const p = this.player;
-    ctx.fillStyle = this.map.palette.floor;
-    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+    this.drawFloor(ctx);
 
-    ctx.fillStyle = this.map.palette.wall;
-    for (const o of this.map.obstacles) ctx.fillRect(o.x, o.y, o.w, o.h);
+    for (const o of this.map.obstacles) this.drawObstacle3D(ctx, o);
 
-    ctx.fillStyle = this.map.palette.cover;
-    for (const o of this.map.obstacles) {
-      ctx.fillRect(o.x + 4, o.y + 4, o.w - 8, o.h - 8);
-    }
-
-    ctx.strokeStyle = '#6f95bf';
+    ctx.strokeStyle = '#8bc2ff';
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(p.x, p.y);
     ctx.lineTo(this.input.mouseX, this.input.mouseY);
     ctx.stroke();
+    ctx.lineWidth = 1;
 
-    ctx.fillStyle = '#49c2ff';
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-    ctx.fill();
+    this.drawAgent(ctx, p, '#49c2ff');
 
     for (const e of this.enemies) {
       if (e.dead) continue;
-      ctx.fillStyle = '#ff6868';
-      ctx.beginPath();
-      ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
-      ctx.fill();
+      this.drawAgent(ctx, e, '#ff6868');
       ctx.fillStyle = '#121212';
       ctx.fillRect(e.x - 15, e.y - 24, 30, 5);
       ctx.fillStyle = '#7eff90';
       ctx.fillRect(e.x - 15, e.y - 24, (e.hp / 100) * 30, 5);
     }
 
-    ctx.fillStyle = '#ffd37f';
     for (const b of this.bullets) {
+      ctx.fillStyle = b.team === 'alpha' ? '#ffe7ad' : '#ffaeae';
       ctx.fillRect(b.x - 2, b.y - 2, 4, 4);
+      ctx.fillStyle = 'rgba(255, 213, 127, 0.3)';
+      ctx.fillRect(b.x - 4, b.y - 4, 8, 8);
     }
   }
 
