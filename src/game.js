@@ -1,65 +1,58 @@
-import { Soldier, WeaponState, resolveCollision, rayIntersectsRect } from './entities.js';
+import { MAPS, WEAPONS, wallAt } from './data.js';
+import { Bot, Player } from './entities.js';
 
-const WIDTH = 1366;
-const HEIGHT = 768;
-const ROUND_TIME = 120;
-const MAX_ROUNDS = 16;
+const FOV = Math.PI / 3;
+
+function clamp(v, lo, hi) {
+  return Math.min(hi, Math.max(lo, v));
+}
+
+function dist(ax, ay, bx, by) {
+  return Math.hypot(ax - bx, ay - by);
+}
 
 export class Game {
-  constructor(canvas, hud, config) {
+  constructor(canvas, hud) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.hud = hud;
-    this.map = config.map;
-    this.loadout = config.loadout;
-    this.score = { alpha: 0, bravo: 0 };
-    this.round = 1;
-    this.roundClock = ROUND_TIME;
-    this.bullets = [];
-    this.lastTime = 0;
-    this.input = { keys: new Set(), mouseX: WIDTH / 2, mouseY: HEIGHT / 2, firing: false };
-
-    this.setupRound();
-    this.bindInput();
+    this.map = MAPS[0];
+    this.weaponIndex = 3;
+    this.player = new Player(this.map.playerSpawn.x, this.map.playerSpawn.y, this.map.playerSpawn.dir, WEAPONS[this.weaponIndex]);
+    this.bots = this.map.botSpawns.map((s) => new Bot(s.x, s.y));
+    this.keys = new Set();
+    this.mouseDX = 0;
+    this.mouseDY = 0;
+    this.isFiring = false;
+    this.last = 0;
+    this.running = false;
+    this.roundTime = 180;
+    this.damageFlash = 0;
+    this.bind();
   }
 
-  setupRound() {
-    const p = new Soldier(this.map.playerSpawn.x, this.map.playerSpawn.y);
-    p.armor = this.loadout.armor;
-    p.speedBase *= this.loadout.mobility;
-    p.weapons = [new WeaponState(this.loadout.primary), new WeaponState(this.loadout.secondary)];
-    p.active = 0;
-    this.player = p;
-
-    this.enemies = this.map.enemySpawns.map((sp) => {
-      const e = new Soldier(sp.x, sp.y, 14);
-      e.armor = 30;
-      e.speedBase = 180;
-      e.weapon = new WeaponState({ name: 'AK-12', damage: 22, fireRate: 8, magSize: 30, reserve: 120, reload: 2.2, spread: 0.065, velocity: 980 });
-      e.strafeSeed = Math.random() * Math.PI * 2;
-      return e;
-    });
-    this.roundClock = ROUND_TIME;
-    this.bullets.length = 0;
-    this.updateHUD();
-  }
-
-  bindInput() {
+  bind() {
     this.onKeyDown = (e) => {
-      this.input.keys.add(e.key.toLowerCase());
-      if (e.key.toLowerCase() === 'r') this.currentWeapon().startReload();
-      if (e.key.toLowerCase() === 'q') this.player.active = this.player.active ? 0 : 1;
-      if (e.key === '1') this.player.active = 0;
-      if (e.key === '2') this.player.active = 1;
+      const k = e.key.toLowerCase();
+      this.keys.add(k);
+      if (k === 'r') this.player.weapon.startReload();
+      if (k === 'e') this.cycleWeapon(1);
+      if (k === 'q') this.cycleWeapon(-1);
+      if (k === 'escape') document.exitPointerLock();
     };
-    this.onKeyUp = (e) => this.input.keys.delete(e.key.toLowerCase());
+    this.onKeyUp = (e) => this.keys.delete(e.key.toLowerCase());
     this.onMouseMove = (e) => {
-      const rect = this.canvas.getBoundingClientRect();
-      this.input.mouseX = (e.clientX - rect.left) * (WIDTH / rect.width);
-      this.input.mouseY = (e.clientY - rect.top) * (HEIGHT / rect.height);
+      if (document.pointerLockElement !== this.canvas) return;
+      this.mouseDX += e.movementX;
+      this.mouseDY += e.movementY;
     };
-    this.onMouseDown = () => { this.input.firing = true; };
-    this.onMouseUp = () => { this.input.firing = false; };
+    this.onMouseDown = () => {
+      this.isFiring = true;
+      if (document.pointerLockElement !== this.canvas) this.canvas.requestPointerLock();
+    };
+    this.onMouseUp = () => {
+      this.isFiring = false;
+    };
 
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
@@ -68,7 +61,13 @@ export class Game {
     window.addEventListener('mouseup', this.onMouseUp);
   }
 
-  destroy() {
+  cycleWeapon(delta) {
+    this.weaponIndex = (this.weaponIndex + delta + WEAPONS.length) % WEAPONS.length;
+    this.player.weapon = new (this.player.weapon.constructor)(WEAPONS[this.weaponIndex]);
+  }
+
+  stop() {
+    this.running = false;
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
     this.canvas.removeEventListener('mousemove', this.onMouseMove);
@@ -76,265 +75,225 @@ export class Game {
     window.removeEventListener('mouseup', this.onMouseUp);
   }
 
-  currentWeapon() { return this.player.weapons[this.player.active]; }
+  start() {
+    this.running = true;
+    requestAnimationFrame((t) => this.loop(t));
+  }
 
-  tryShoot(shooter, targetX, targetY, weapon) {
-    if (!weapon.canShoot()) return;
-    weapon.shoot();
-    const aim = Math.atan2(targetY - shooter.y, targetX - shooter.x);
-    const spread = (Math.random() - 0.5) * weapon.def.spread;
-    const angle = aim + spread;
-    this.bullets.push({
-      x: shooter.x,
-      y: shooter.y,
-      vx: Math.cos(angle) * weapon.def.velocity,
-      vy: Math.sin(angle) * weapon.def.velocity,
-      ttl: 1.2,
-      damage: weapon.def.damage,
-      team: shooter === this.player ? 'alpha' : 'bravo',
-    });
+  loop(ts) {
+    if (!this.running) return;
+    const dt = clamp((ts - this.last) / 1000 || 0.016, 0, 0.034);
+    this.last = ts;
+    this.update(dt);
+    this.render();
+    requestAnimationFrame((t) => this.loop(t));
   }
 
   update(dt) {
-    this.roundClock = Math.max(0, this.roundClock - dt);
-    if (this.roundClock <= 0) this.endRound('bravo', 'Time expired. Defenders win.');
+    this.roundTime = Math.max(0, this.roundTime - dt);
+    this.damageFlash = Math.max(0, this.damageFlash - dt * 2);
+    this.player.weapon.update(dt);
 
-    const p = this.player;
-    const keys = this.input.keys;
-    const sprint = keys.has('shift') && p.stamina > 1;
-    const speed = p.speedBase * (sprint ? 1.55 : 1);
-    const moveX = (keys.has('d') ? 1 : 0) - (keys.has('a') ? 1 : 0);
-    const moveY = (keys.has('s') ? 1 : 0) - (keys.has('w') ? 1 : 0);
-    const len = Math.hypot(moveX, moveY) || 1;
-    p.vx = (moveX / len) * speed;
-    p.vy = (moveY / len) * speed;
-    p.x = Math.max(p.radius, Math.min(WIDTH - p.radius, p.x + p.vx * dt));
-    p.y = Math.max(p.radius, Math.min(HEIGHT - p.radius, p.y + p.vy * dt));
-    resolveCollision(p, this.map.obstacles);
-    p.angle = Math.atan2(this.input.mouseY - p.y, this.input.mouseX - p.x);
+    const lookSpeed = 0.0022;
+    this.player.dir += this.mouseDX * lookSpeed;
+    this.player.pitch = clamp(this.player.pitch + this.mouseDY * 0.0012, -0.15, 0.15);
+    this.mouseDX = 0;
+    this.mouseDY = 0;
 
-    p.stamina = sprint ? Math.max(0, p.stamina - 30 * dt) : Math.min(100, p.stamina + 24 * dt);
-
-    const w = this.currentWeapon();
-    w.tick(dt);
-    if (this.input.firing) this.tryShoot(p, this.input.mouseX, this.input.mouseY, w);
-
-    for (const enemy of this.enemies) {
-      if (enemy.dead) continue;
-      const dx = p.x - enemy.x;
-      const dy = p.y - enemy.y;
-      const dist = Math.hypot(dx, dy) || 1;
-      const strafe = Math.sin(performance.now() / 650 + enemy.strafeSeed) * 0.5;
-      enemy.vx = (dx / dist) * enemy.speedBase + (-dy / dist) * enemy.speedBase * 0.28 * strafe;
-      enemy.vy = (dy / dist) * enemy.speedBase + (dx / dist) * enemy.speedBase * 0.28 * strafe;
-      if (dist < 240) {
-        enemy.vx *= -0.3;
-        enemy.vy *= -0.3;
-      }
-      enemy.x = Math.max(enemy.radius, Math.min(WIDTH - enemy.radius, enemy.x + enemy.vx * dt));
-      enemy.y = Math.max(enemy.radius, Math.min(HEIGHT - enemy.radius, enemy.y + enemy.vy * dt));
-      resolveCollision(enemy, this.map.obstacles);
-      enemy.weapon.tick(dt);
-      if (dist < 900) {
-        let blocked = false;
-        for (const o of this.map.obstacles) {
-          if (rayIntersectsRect(enemy.x, enemy.y, p.x, p.y, o)) {
-            blocked = true;
-            break;
-          }
-        }
-        if (!blocked) this.tryShoot(enemy, p.x, p.y, enemy.weapon);
-      }
-      if (enemy.weapon.mag === 0) enemy.weapon.startReload();
+    const sprint = this.keys.has('shift') ? 1.55 : 1;
+    const speed = this.player.speed * sprint;
+    let dx = 0;
+    let dy = 0;
+    if (this.keys.has('w')) {
+      dx += Math.cos(this.player.dir);
+      dy += Math.sin(this.player.dir);
     }
-
-    for (const b of this.bullets) {
-      b.x += b.vx * dt;
-      b.y += b.vy * dt;
-      b.ttl -= dt;
-      if (b.x < 0 || b.x > WIDTH || b.y < 0 || b.y > HEIGHT) b.ttl = 0;
-      for (const o of this.map.obstacles) {
-        if (b.x > o.x && b.x < o.x + o.w && b.y > o.y && b.y < o.y + o.h) b.ttl = 0;
-      }
-      const targets = b.team === 'alpha' ? this.enemies : [p];
-      for (const t of targets) {
-        if (t.dead) continue;
-        if (Math.hypot(t.x - b.x, t.y - b.y) < t.radius) {
-          t.applyDamage(b.damage);
-          b.ttl = 0;
-        }
-      }
+    if (this.keys.has('s')) {
+      dx -= Math.cos(this.player.dir);
+      dy -= Math.sin(this.player.dir);
     }
-    this.bullets = this.bullets.filter((b) => b.ttl > 0);
+    if (this.keys.has('a')) {
+      dx += Math.cos(this.player.dir - Math.PI / 2);
+      dy += Math.sin(this.player.dir - Math.PI / 2);
+    }
+    if (this.keys.has('d')) {
+      dx += Math.cos(this.player.dir + Math.PI / 2);
+      dy += Math.sin(this.player.dir + Math.PI / 2);
+    }
+    const len = Math.hypot(dx, dy) || 1;
+    this.tryMove(this.player, (dx / len) * speed * dt, (dy / len) * speed * dt);
 
-    if (p.dead) this.endRound('bravo', 'You were eliminated.');
-    if (this.enemies.every((e) => e.dead)) this.endRound('alpha', 'Enemy squad wiped out.');
+    if (this.isFiring) this.firePlayerWeapon();
 
-    this.updateHUD();
-  }
+    for (const bot of this.bots) {
+      if (!bot.alive) continue;
+      bot.attackCooldown = Math.max(0, bot.attackCooldown - dt);
+      bot.turnTimer -= dt;
 
-  endRound(winner, reason) {
-    if (this.roundResolved) return;
-    this.roundResolved = true;
-    this.score[winner] += 1;
-    this.hud.banner.textContent = `${winner.toUpperCase()} round won — ${reason}`;
-    this.hud.banner.classList.remove('hidden');
-
-    setTimeout(() => {
-      this.hud.banner.classList.add('hidden');
-      this.round += 1;
-      if (this.round > MAX_ROUNDS || this.score.alpha >= 9 || this.score.bravo >= 9) {
-        const champ = this.score.alpha > this.score.bravo ? 'Alpha Team' : 'Bravo Team';
-        this.hud.banner.textContent = `${champ} wins the match (${this.score.alpha}-${this.score.bravo})`;
-        this.hud.banner.classList.remove('hidden');
-        setTimeout(() => {
-          this.onExit?.();
-        }, 2200);
+      const playerDist = dist(bot.x, bot.y, this.player.x, this.player.y);
+      if (playerDist < 8) {
+        bot.dir = Math.atan2(this.player.y - bot.y, this.player.x - bot.x);
+        const step = Math.min(playerDist - 1.2, bot.speed * dt);
+        if (step > 0) this.tryMove(bot, Math.cos(bot.dir) * step, Math.sin(bot.dir) * step);
+        if (playerDist < 6 && bot.attackCooldown === 0 && this.hasLineOfSight(bot.x, bot.y, this.player.x, this.player.y)) {
+          this.player.hp = Math.max(0, this.player.hp - 8);
+          this.damageFlash = 1;
+          bot.attackCooldown = 0.45 + Math.random() * 0.6;
+        }
       } else {
-        this.roundResolved = false;
-        this.setupRound();
+        if (bot.turnTimer <= 0) {
+          bot.turnTimer = 1 + Math.random() * 2;
+          bot.dir += (Math.random() - 0.5) * 1.6;
+        }
+        this.tryMove(bot, Math.cos(bot.dir) * bot.speed * dt * 0.5, Math.sin(bot.dir) * bot.speed * dt * 0.5);
       }
-    }, 1800);
-  }
-
-  drawFloor(ctx) {
-    const sky = ctx.createLinearGradient(0, 0, 0, HEIGHT * 0.45);
-    sky.addColorStop(0, '#1a2638');
-    sky.addColorStop(1, this.map.palette.floor);
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, WIDTH, HEIGHT);
-
-    const horizonY = HEIGHT * 0.32;
-    ctx.strokeStyle = 'rgba(200, 220, 255, 0.12)';
-    for (let y = horizonY; y < HEIGHT; y += 36) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(WIDTH, y);
-      ctx.stroke();
     }
-    for (let x = 0; x <= WIDTH; x += 80) {
-      ctx.beginPath();
-      ctx.moveTo(x, HEIGHT);
-      ctx.lineTo(WIDTH / 2, horizonY);
-      ctx.stroke();
+
+    if (this.player.hp === 0 || this.roundTime === 0 || this.bots.every((b) => !b.alive)) {
+      this.resetRound();
+    }
+
+    this.updateHud();
+  }
+
+  resetRound() {
+    this.player.hp = 100;
+    this.player.x = this.map.playerSpawn.x;
+    this.player.y = this.map.playerSpawn.y;
+    this.player.dir = this.map.playerSpawn.dir;
+    this.roundTime = 180;
+    this.bots = this.map.botSpawns.map((s) => new Bot(s.x, s.y));
+    this.player.weapon = new (this.player.weapon.constructor)(WEAPONS[this.weaponIndex]);
+  }
+
+  firePlayerWeapon() {
+    const w = this.player.weapon;
+    if (!w.fire()) return;
+
+    const shotAngle = this.player.dir + (Math.random() - 0.5) * w.def.spread;
+    let best = null;
+    for (const bot of this.bots) {
+      if (!bot.alive) continue;
+      const angle = Math.atan2(bot.y - this.player.y, bot.x - this.player.x);
+      const d = dist(bot.x, bot.y, this.player.x, this.player.y);
+      const angleDelta = Math.abs(Math.atan2(Math.sin(angle - shotAngle), Math.cos(angle - shotAngle)));
+      const hitWindow = 0.08 + 0.16 / Math.max(1.4, d);
+      if (angleDelta < hitWindow && d <= w.def.range && this.hasLineOfSight(this.player.x, this.player.y, bot.x, bot.y)) {
+        if (!best || d < best.dist) best = { bot, dist: d };
+      }
+    }
+    if (best) {
+      best.bot.hp = Math.max(0, best.bot.hp - w.def.damage);
+      if (!best.bot.alive) this.player.score += 1;
     }
   }
 
-  drawObstacle3D(ctx, o) {
-    const depthX = 18;
-    const depthY = 14;
-    ctx.fillStyle = this.map.palette.wall;
-    ctx.fillRect(o.x, o.y, o.w, o.h);
-
-    ctx.beginPath();
-    ctx.moveTo(o.x, o.y);
-    ctx.lineTo(o.x + depthX, o.y - depthY);
-    ctx.lineTo(o.x + o.w + depthX, o.y - depthY);
-    ctx.lineTo(o.x + o.w, o.y);
-    ctx.closePath();
-    ctx.fillStyle = this.map.palette.cover;
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.moveTo(o.x + o.w, o.y);
-    ctx.lineTo(o.x + o.w + depthX, o.y - depthY);
-    ctx.lineTo(o.x + o.w + depthX, o.y + o.h - depthY);
-    ctx.lineTo(o.x + o.w, o.y + o.h);
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
-    ctx.fill();
+  hasLineOfSight(ax, ay, bx, by) {
+    const step = 0.05;
+    const total = dist(ax, ay, bx, by);
+    const dx = (bx - ax) / total;
+    const dy = (by - ay) / total;
+    for (let t = 0; t < total; t += step) {
+      if (wallAt(this.map, ax + dx * t, ay + dy * t) !== '0') return false;
+    }
+    return true;
   }
 
-  drawAgent(ctx, entity, baseColor) {
-    const shadowW = entity.radius * 2.2;
-    const shadowH = entity.radius * 1.05;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
-    ctx.beginPath();
-    ctx.ellipse(entity.x + 6, entity.y + entity.radius * 0.65, shadowW, shadowH, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    const body = ctx.createRadialGradient(
-      entity.x - entity.radius * 0.4,
-      entity.y - entity.radius * 0.6,
-      entity.radius * 0.2,
-      entity.x,
-      entity.y,
-      entity.radius * 1.2,
-    );
-    body.addColorStop(0, '#ffffff');
-    body.addColorStop(0.14, baseColor);
-    body.addColorStop(1, 'rgba(0, 0, 0, 0.85)');
-    ctx.fillStyle = body;
-    ctx.beginPath();
-    ctx.arc(entity.x, entity.y, entity.radius, 0, Math.PI * 2);
-    ctx.fill();
+  tryMove(actor, dx, dy) {
+    const nx = actor.x + dx;
+    const ny = actor.y + dy;
+    if (wallAt(this.map, nx, actor.y) === '0') actor.x = nx;
+    if (wallAt(this.map, actor.x, ny) === '0') actor.y = ny;
   }
 
-  draw() {
-    const ctx = this.ctx;
-    const p = this.player;
-    this.drawFloor(ctx);
+  castRay(angle) {
+    const step = 0.015;
+    let d = 0;
+    while (d < 20) {
+      const x = this.player.x + Math.cos(angle) * d;
+      const y = this.player.y + Math.sin(angle) * d;
+      if (wallAt(this.map, x, y) !== '0') return d;
+      d += step;
+    }
+    return 20;
+  }
 
-    for (const o of this.map.obstacles) this.drawObstacle3D(ctx, o);
+  render() {
+    const { ctx, canvas } = this;
+    const w = canvas.width;
+    const h = canvas.height;
 
-    ctx.strokeStyle = '#8bc2ff';
-    ctx.lineWidth = 1.5;
+    ctx.fillStyle = '#89b7ff';
+    const skyShift = this.player.pitch * h;
+    ctx.fillRect(0, 0, w, h / 2 + skyShift);
+    ctx.fillStyle = '#3d3b34';
+    ctx.fillRect(0, h / 2 + skyShift, w, h / 2 - skyShift);
+
+    for (let x = 0; x < w; x++) {
+      const rayAngle = this.player.dir - FOV / 2 + (x / w) * FOV;
+      const d = this.castRay(rayAngle);
+      const fixed = d * Math.cos(rayAngle - this.player.dir);
+      const wallH = Math.min(h, (h / fixed) * 0.9);
+      const y = h / 2 - wallH / 2 + skyShift;
+      const shade = clamp(220 - fixed * 18, 50, 220);
+      ctx.fillStyle = `rgb(${shade * 0.65}, ${shade * 0.8}, ${shade})`;
+      ctx.fillRect(x, y, 1, wallH);
+    }
+
+    const sprites = this.bots
+      .filter((b) => b.alive)
+      .map((b) => {
+        const dx = b.x - this.player.x;
+        const dy = b.y - this.player.y;
+        const d = Math.hypot(dx, dy);
+        let angle = Math.atan2(dy, dx) - this.player.dir;
+        angle = Math.atan2(Math.sin(angle), Math.cos(angle));
+        return { b, d, angle };
+      })
+      .filter((s) => Math.abs(s.angle) < FOV / 1.7)
+      .sort((a, b) => b.d - a.d);
+
+    for (const s of sprites) {
+      const sx = ((s.angle + FOV / 2) / FOV) * w;
+      const size = clamp((h / s.d) * 0.75, 14, 260);
+      const sy = h / 2 - size / 2 + skyShift;
+      ctx.fillStyle = '#bc3e3e';
+      ctx.fillRect(sx - size / 2, sy, size, size);
+      ctx.fillStyle = '#2b1010';
+      ctx.fillRect(sx - size * 0.12, sy + size * 0.2, size * 0.08, size * 0.08);
+      ctx.fillRect(sx + size * 0.04, sy + size * 0.2, size * 0.08, size * 0.08);
+    }
+
+    ctx.strokeStyle = '#ffffff';
     ctx.beginPath();
-    ctx.moveTo(p.x, p.y);
-    ctx.lineTo(this.input.mouseX, this.input.mouseY);
+    ctx.moveTo(w / 2 - 8, h / 2);
+    ctx.lineTo(w / 2 + 8, h / 2);
+    ctx.moveTo(w / 2, h / 2 - 8);
+    ctx.lineTo(w / 2, h / 2 + 8);
     ctx.stroke();
-    ctx.lineWidth = 1;
 
-    this.drawAgent(ctx, p, '#49c2ff');
+    const recoil = (1 - this.player.weapon.cooldown * this.player.weapon.def.fireRate) * 14;
+    ctx.fillStyle = '#1f1f1f';
+    ctx.fillRect(w * 0.68, h * 0.74 + recoil, w * 0.26, h * 0.22);
+    ctx.fillStyle = '#454545';
+    ctx.fillRect(w * 0.75, h * 0.8 + recoil, w * 0.18, h * 0.08);
 
-    for (const e of this.enemies) {
-      if (e.dead) continue;
-      this.drawAgent(ctx, e, '#ff6868');
-      ctx.fillStyle = '#121212';
-      ctx.fillRect(e.x - 15, e.y - 24, 30, 5);
-      ctx.fillStyle = '#7eff90';
-      ctx.fillRect(e.x - 15, e.y - 24, (e.hp / 100) * 30, 5);
-    }
-
-    for (const b of this.bullets) {
-      ctx.fillStyle = b.team === 'alpha' ? '#ffe7ad' : '#ffaeae';
-      ctx.fillRect(b.x - 2, b.y - 2, 4, 4);
-      ctx.fillStyle = 'rgba(255, 213, 127, 0.3)';
-      ctx.fillRect(b.x - 4, b.y - 4, 8, 8);
+    if (this.damageFlash > 0) {
+      ctx.fillStyle = `rgba(255, 40, 40, ${this.damageFlash * 0.28})`;
+      ctx.fillRect(0, 0, w, h);
     }
   }
 
-  updateHUD() {
-    const p = this.player;
-    const w = this.currentWeapon();
-    this.hud.hp.textContent = Math.round(p.hp);
-    this.hud.armor.textContent = Math.round(p.armor);
-    this.hud.stamina.textContent = Math.round(p.stamina);
-    this.hud.weapon.textContent = `${w.def.name}${w.reloading > 0 ? ' (Reloading)' : ''}`;
-    this.hud.ammo.textContent = `${w.mag} / ${w.reserve}`;
-    this.hud.round.textContent = `Round ${this.round} / ${MAX_ROUNDS}`;
-    this.hud.score.textContent = `Alpha ${this.score.alpha} - ${this.score.bravo} Bravo`;
-    const m = Math.floor(this.roundClock / 60).toString().padStart(2, '0');
-    const s = Math.floor(this.roundClock % 60).toString().padStart(2, '0');
-    this.hud.timer.textContent = `${m}:${s}`;
-  }
-
-  start() {
-    const frame = (ts) => {
-      if (!this.lastTime) this.lastTime = ts;
-      const dt = Math.min(0.033, (ts - this.lastTime) / 1000);
-      this.lastTime = ts;
-      if (!this.stopped) {
-        if (!this.roundResolved) this.update(dt);
-        this.draw();
-        requestAnimationFrame(frame);
-      }
-    };
-    requestAnimationFrame(frame);
-  }
-
-  stop() {
-    this.stopped = true;
-    this.destroy();
+  updateHud() {
+    const aliveBots = this.bots.filter((b) => b.alive).length;
+    this.hud.weapon.textContent = `${this.player.weapon.def.name} (${this.player.weapon.def.era})`;
+    this.hud.ammo.textContent = `${this.player.weapon.mag}/${this.player.weapon.reserve}`;
+    this.hud.hp.textContent = String(Math.ceil(this.player.hp));
+    this.hud.kills.textContent = String(this.player.score);
+    this.hud.enemies.textContent = String(aliveBots);
+    const mins = String(Math.floor(this.roundTime / 60)).padStart(2, '0');
+    const secs = String(Math.floor(this.roundTime % 60)).padStart(2, '0');
+    this.hud.timer.textContent = `${mins}:${secs}`;
+    this.hud.status.textContent = this.player.weapon.reloadLeft > 0 ? `Reloading ${(this.player.weapon.reloadLeft).toFixed(1)}s` : 'Hot Zone';
   }
 }

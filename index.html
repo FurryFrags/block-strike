@@ -3,86 +3,38 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Block Strike: Modern Siege</title>
+  <title>Block Strike: Voxel Frontline</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div id="app">
-    <div id="menuScreen" class="screen active">
-      <div class="panel wide">
-        <h1>BLOCK STRIKE: MODERN SIEGE</h1>
-        <p class="subtitle">Tactical round-based shooter prototype inspired by classic competitive FPS design.</p>
-        <div class="menu-grid">
-          <button id="startBtn" class="cta">Deploy</button>
-          <button id="loadoutBtn">Loadouts</button>
-          <button id="mapsBtn">Maps</button>
-          <button id="howToBtn">How To Play</button>
-        </div>
-      </div>
-    </div>
-
-    <div id="loadoutScreen" class="screen">
-      <div class="panel wide">
-        <h2>Operator Loadout Builder</h2>
-        <p>Select a primary and secondary weapon package.</p>
-        <div id="loadoutOptions" class="cards"></div>
-        <div class="actions">
-          <button id="saveLoadoutBtn" class="cta">Save Loadout</button>
-          <button data-back>Back</button>
-        </div>
-      </div>
-    </div>
-
-    <div id="mapsScreen" class="screen">
-      <div class="panel wide">
-        <h2>Map Rotation</h2>
-        <p>Choose active battleground.</p>
-        <div id="mapOptions" class="cards"></div>
-        <div class="actions">
-          <button data-back>Back</button>
-        </div>
-      </div>
-    </div>
-
-    <div id="helpScreen" class="screen">
-      <div class="panel">
-        <h2>Controls & Rules</h2>
-        <ul>
-          <li><strong>WASD:</strong> Move</li>
-          <li><strong>Shift:</strong> Sprint (uses stamina)</li>
-          <li><strong>Mouse:</strong> Aim</li>
-          <li><strong>Left Click:</strong> Fire weapon</li>
-          <li><strong>R:</strong> Reload</li>
-          <li><strong>Q:</strong> Swap weapon</li>
-          <li><strong>1/2:</strong> Force select primary/secondary</li>
-        </ul>
-        <p>Win rounds by eliminating the enemy squad before timer expires.</p>
-        <div class="actions"><button data-back>Back</button></div>
-      </div>
-    </div>
-
-    <div id="gameScreen" class="screen">
-      <div id="hud">
-        <div class="left">
-          <div>HP: <span id="hudHp">100</span></div>
-          <div>Armor: <span id="hudArmor">60</span></div>
-          <div>Stamina: <span id="hudStamina">100</span></div>
-        </div>
-        <div class="center">
-          <div id="hudRound">Round 1 / 16</div>
-          <div id="hudTimer">02:00</div>
-          <div id="hudScore">Alpha 0 - 0 Bravo</div>
-        </div>
-        <div class="right">
-          <div id="hudWeapon">M4A1</div>
-          <div>Ammo: <span id="hudAmmo">30 / 90</span></div>
-          <button id="exitBtn">Exit</button>
-        </div>
-      </div>
-      <canvas id="gameCanvas" width="1366" height="768"></canvas>
-      <div id="roundBanner" class="banner hidden"></div>
+  <div id="menu" class="screen">
+    <div class="panel">
+      <h1>BLOCK STRIKE: VOXEL FRONTLINE</h1>
+      <p>Minecraft-style fast FPS sandbox with weapons spanning WW2 to the modern era.</p>
+      <ul>
+        <li>WASD to move, mouse to look</li>
+        <li>Left click to fire, R reload</li>
+        <li>Q / E swaps weapon era</li>
+        <li>Shift to sprint</li>
+      </ul>
+      <button id="playBtn">Deploy</button>
     </div>
   </div>
+
+  <div id="gameWrap" class="hidden">
+    <div id="hud">
+      <div>HP <span id="hudHp">100</span></div>
+      <div id="hudWeapon">M4A1</div>
+      <div>Ammo <span id="hudAmmo">30/90</span></div>
+      <div>Kills <span id="hudKills">0</span></div>
+      <div>Enemies <span id="hudEnemies">0</span></div>
+      <div id="hudTimer">03:00</div>
+      <div id="hudStatus">Hot Zone</div>
+      <button id="exitBtn">Exit</button>
+    </div>
+    <canvas id="gameCanvas" width="1280" height="720"></canvas>
+  </div>
+
   <script type="module" src="src/main.js"></script>
 </body>
 </html>
