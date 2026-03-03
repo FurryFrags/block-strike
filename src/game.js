@@ -14,10 +14,10 @@ function dist2d(ax, az, bx, bz) {
 }
 
 export class Game {
-  constructor(canvas, hud) {
+  constructor(canvas, hud, mapSelection = 0) {
     this.canvas = canvas;
     this.hud = hud;
-    this.map = MAPS[0];
+    this.map = Game.resolveMap(mapSelection);
     this.weaponIndex = 3;
     this.weapon = new WeaponState(WEAPONS[this.weaponIndex]);
     this.score = 0;
@@ -58,6 +58,20 @@ export class Game {
     this.spawnBots();
     this.buildViewModel();
     this.bind();
+  }
+
+  static resolveMap(mapSelection) {
+    if (typeof mapSelection === 'number' && Number.isInteger(mapSelection) && MAPS[mapSelection]) {
+      return MAPS[mapSelection];
+    }
+
+    if (typeof mapSelection === 'string') {
+      const mapById = MAPS.find((m) => m.id === mapSelection);
+      if (mapById) return mapById;
+    }
+
+    console.warn(`[Game] Invalid map selection "${mapSelection}". Falling back to MAPS[0].`);
+    return MAPS[0];
   }
 
   buildWorld() {
