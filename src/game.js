@@ -5,6 +5,9 @@ import { BotCharacter, WeaponState } from './entities.js';
 const PLAYER_RADIUS = 0.28;
 const PLAYER_HEIGHT = 1.7;
 const BOT_RADIUS = 0.3;
+const GRAVITY = -22;
+const BOT_GROUND_Y = -0.49;
+const BOT_SPAWN_Y = BOT_GROUND_Y + 1.2;
 
 function clamp(v, lo, hi) {
   return Math.min(hi, Math.max(lo, v));
@@ -149,6 +152,7 @@ export class Game {
     const makeTeam = (team) => (this.map.teamSpawns?.[team] ?? []).map((s) => {
       const safe = this.findSafeSpawn(s);
       const bot = new BotCharacter(safe.x, safe.y, team);
+      bot.group.position.y = BOT_SPAWN_Y;
       this.scene.add(bot.group);
       return bot;
     });
@@ -366,6 +370,7 @@ export class Game {
     for (const bot of this.bots) {
       if (!bot.alive) continue;
       const botPos = bot.group.position;
+      this.applyBotGravity(bot, dt);
       const target = this.getBotTarget(bot);
       if (!target) continue;
       const d = dist2d(botPos.x, botPos.z, target.x, target.z);
@@ -389,6 +394,15 @@ export class Game {
           bot.attackCooldown = 0.5 + Math.random() * 0.55;
         }
       }
+    }
+  }
+
+  applyBotGravity(bot, dt) {
+    bot.verticalVelocity += GRAVITY * dt;
+    bot.group.position.y += bot.verticalVelocity * dt;
+    if (bot.group.position.y <= BOT_GROUND_Y) {
+      bot.group.position.y = BOT_GROUND_Y;
+      bot.verticalVelocity = 0;
     }
   }
 
@@ -429,7 +443,8 @@ export class Game {
     const spawn = candidates[Math.floor(Math.random() * candidates.length)] ?? this.map.playerSpawn;
     const safe = this.findSafeSpawn(spawn);
     bot.hp = 100;
-    bot.group.position.set(safe.x, 0, safe.y);
+    bot.verticalVelocity = 0;
+    bot.group.position.set(safe.x, BOT_SPAWN_Y, safe.y);
     bot.group.visible = true;
   }
 
