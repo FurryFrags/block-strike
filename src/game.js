@@ -3,11 +3,12 @@ import { MAPS, WEAPONS, wallAt } from './data.js';
 import { BotCharacter, WeaponState } from './entities.js';
 
 const PLAYER_RADIUS = 0.28;
-const PLAYER_HEIGHT = 1.7;
+const PLAYER_HEAD_Y = 1.74;
 const BOT_RADIUS = 0.3;
 const GRAVITY = -22;
 const BOT_GROUND_Y = -0.49;
 const BOT_SPAWN_Y = BOT_GROUND_Y + 1.2;
+const PERSPECTIVES = ['first-person', 'third-person-back', 'third-person-front'];
 
 function clamp(v, lo, hi) {
   return Math.min(hi, Math.max(lo, v));
@@ -43,7 +44,7 @@ export class Game {
     this.cameraRig = new THREE.Group();
     this.pitchPivot = new THREE.Group();
     this.camera = new THREE.PerspectiveCamera(75, (canvas.clientWidth || 1280) / (canvas.clientHeight || 720), 0.1, 220);
-    this.camera.position.y = PLAYER_HEIGHT;
+    this.camera.position.y = PLAYER_HEAD_Y;
     this.pitchPivot.add(this.camera);
     this.cameraRig.add(this.pitchPivot);
     this.scene.add(this.cameraRig);
@@ -54,6 +55,7 @@ export class Game {
     this.mouse = { dx: 0, dy: 0 };
     this.isFiring = false;
     this.damageFlash = 0;
+    this.perspectiveIndex = 0;
 
     this.worldBlocks = [];
     this.wallBoxes = [];
@@ -61,6 +63,7 @@ export class Game {
     this.raycaster = new THREE.Raycaster();
 
     this.buildWorld();
+    this.buildPlayerModel();
     this.spawnPlayer();
     this.spawnBots();
     this.buildViewModel();
@@ -146,6 +149,7 @@ export class Game {
     this.cameraRig.position.copy(this.playerPos);
     this.cameraRig.rotation.y = this.map.playerSpawn.dir;
     this.pitchPivot.rotation.x = 0;
+    this.updateCameraPerspective();
   }
 
   spawnBots() {
@@ -201,6 +205,57 @@ export class Game {
     this.viewModel.add(this.leftForearm, this.leftHand, this.rightForearm, this.rightHand, this.weaponMesh);
   }
 
+  buildPlayerModel() {
+    const skin = new THREE.MeshStandardMaterial({ color: '#e6b391', roughness: 0.7 });
+    const shirt = new THREE.MeshStandardMaterial({ color: '#2c4b67', roughness: 0.8 });
+    const pants = new THREE.MeshStandardMaterial({ color: '#28313a', roughness: 0.82 });
+
+    this.playerBody = new THREE.Group();
+
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.62, 0.28), shirt);
+    torso.position.y = 1.42;
+    this.playerHead = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.34, 0.34), skin);
+    this.playerHead.position.y = 1.93;
+
+    const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.54, 0.16), shirt);
+    leftArm.position.set(-0.36, 1.42, 0);
+    const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.54, 0.16), shirt);
+    rightArm.position.set(0.36, 1.42, 0);
+
+    const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.62, 0.2), pants);
+    leftLeg.position.set(-0.14, 0.8, 0);
+    const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.62, 0.2), pants);
+    rightLeg.position.set(0.14, 0.8, 0);
+
+    this.playerBody.add(torso, this.playerHead, leftArm, rightArm, leftLeg, rightLeg);
+    this.cameraRig.add(this.playerBody);
+  }
+
+  get perspectiveName() {
+    return PERSPECTIVES[this.perspectiveIndex];
+  }
+
+  cyclePerspective() {
+    this.perspectiveIndex = (this.perspectiveIndex + 1) % PERSPECTIVES.length;
+    this.updateCameraPerspective();
+  }
+
+  updateCameraPerspective() {
+    if (this.perspectiveName === 'first-person') {
+      this.camera.position.set(0, PLAYER_HEAD_Y, 0);
+      this.camera.rotation.set(0, 0, 0);
+      if (this.viewModel) this.viewModel.visible = true;
+      this.playerHead.visible = false;
+      return;
+    }
+
+    const isFront = this.perspectiveName === 'third-person-front';
+    this.camera.position.set(0, PLAYER_HEAD_Y + 0.35, isFront ? -3.2 : 3.2);
+    this.camera.rotation.set(0, isFront ? Math.PI : 0, 0);
+    if (this.viewModel) this.viewModel.visible = false;
+    this.playerHead.visible = true;
+  }
+
   bind() {
     this.onResize = () => {
       const width = this.canvas.clientWidth || window.innerWidth;
@@ -216,6 +271,7 @@ export class Game {
       if (k === 'r') this.weapon.startReload();
       if (k === 'e') this.cycleWeapon(1);
       if (k === 'q') this.cycleWeapon(-1);
+      if (k === 'p') this.cyclePerspective();
       if (k === 'escape') document.exitPointerLock();
     };
 
@@ -449,7 +505,7 @@ export class Game {
   }
 
   canSeeTarget(botPos, target) {
-    const targetY = target.type === 'player' ? PLAYER_HEIGHT : 1.4;
+    const targetY = target.type === 'player' ? PLAYER_HEAD_Y : 1.4;
     const dir = new THREE.Vector3(target.x - botPos.x, targetY - 1.4, target.z - botPos.z).normalize();
     this.raycaster.set(new THREE.Vector3(botPos.x, 1.4, botPos.z), dir);
     this.raycaster.far = dist2d(botPos.x, botPos.z, target.x, target.z);
@@ -493,7 +549,7 @@ export class Game {
     if (this.weapon.reloadLeft > 0) {
       this.hud.status.textContent = `Reloading ${this.weapon.reloadLeft.toFixed(1)}s`;
     } else {
-      this.hud.status.textContent = `${this.map.name} • TDM ${this.teamScores.alpha}-${this.teamScores.beta} / ${this.scoreLimit}`;
+      this.hud.status.textContent = `${this.map.name} • ${this.perspectiveName} • TDM ${this.teamScores.alpha}-${this.teamScores.beta} / ${this.scoreLimit}`;
     }
   }
 }
