@@ -62,6 +62,7 @@ export class BotCharacter {
     this.speed = 2.2;
     this.hp = 100;
     this.attackCooldown = 0;
+    this.verticalVelocity = 0;
     this.walkPhase = Math.random() * Math.PI * 2;
 
     const palette = TEAM_PALETTES[team] ?? TEAM_PALETTES.beta;
