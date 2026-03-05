@@ -3,7 +3,7 @@ import { MAPS, WEAPONS, wallAt } from './data.js';
 import { BotCharacter, WeaponState } from './entities.js';
 
 const PLAYER_RADIUS = 0.28;
-const PLAYER_GROUND_Y = 0;
+const PLAYER_GROUND_Y = -0.49;
 const PLAYER_HEAD_Y = 1.93;
 const PLAYER_JUMP_SPEED = 8.4;
 const BOT_RADIUS = 0.3;
@@ -46,7 +46,7 @@ export class Game {
     this.cameraRig = new THREE.Group();
     this.pitchPivot = new THREE.Group();
     this.camera = new THREE.PerspectiveCamera(75, (canvas.clientWidth || 1280) / (canvas.clientHeight || 720), 0.1, 220);
-    this.camera.position.y = PLAYER_HEAD_Y;
+    this.pitchPivot.position.y = PLAYER_HEAD_Y;
     this.pitchPivot.add(this.camera);
     this.cameraRig.add(this.pitchPivot);
     this.scene.add(this.cameraRig);
@@ -248,7 +248,7 @@ export class Game {
 
   updateCameraPerspective() {
     if (this.perspectiveName === 'first-person') {
-      this.camera.position.set(0, this.playerHead.position.y, 0);
+      this.camera.position.set(0, 0, 0);
       this.camera.rotation.set(0, 0, 0);
       if (this.viewModel) this.viewModel.visible = true;
       this.playerBody.visible = false;
@@ -256,7 +256,7 @@ export class Game {
     }
 
     const isFront = this.perspectiveName === 'third-person-front';
-    this.camera.position.set(0, this.playerHead.position.y + 0.35, isFront ? -3.2 : 3.2);
+    this.camera.position.set(0, 0.35, isFront ? -3.2 : 3.2);
     this.camera.rotation.set(0, isFront ? Math.PI : 0, 0);
     if (this.viewModel) this.viewModel.visible = false;
     this.playerBody.visible = true;
@@ -527,7 +527,7 @@ export class Game {
   }
 
   canSeeTarget(botPos, target) {
-    const targetY = target.type === 'player' ? PLAYER_HEAD_Y : 1.4;
+    const targetY = target.type === 'player' ? this.playerPos.y + PLAYER_HEAD_Y : 1.4;
     const dir = new THREE.Vector3(target.x - botPos.x, targetY - 1.4, target.z - botPos.z).normalize();
     this.raycaster.set(new THREE.Vector3(botPos.x, 1.4, botPos.z), dir);
     this.raycaster.far = dist2d(botPos.x, botPos.z, target.x, target.z);
