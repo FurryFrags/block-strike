@@ -50,6 +50,20 @@ function createLoopArena(width, height, rings = [], links = [], blockers = []) {
   return grid.map((row) => row.join(''));
 }
 
+const MAP_PADDING = 3;
+
+function offsetBox([x0, y0, x1, y1], by = MAP_PADDING) {
+  return [x0 + by, y0 + by, x1 + by, y1 + by];
+}
+
+function offsetPoint(point, by = MAP_PADDING) {
+  return { ...point, x: point.x + by, y: point.y + by };
+}
+
+function offsetRing(ring, by = MAP_PADDING) {
+  return { ...ring, x0: ring.x0 + by, y0: ring.y0 + by, x1: ring.x1 + by, y1: ring.y1 + by };
+}
+
 function buildProps(width, height) {
   const props = [];
   for (let x = 6.5; x < width - 5; x += 9) {
@@ -61,15 +75,21 @@ function buildProps(width, height) {
 }
 
 function makeMap(id, name, width, height, rings, links, blockers, alphaSpawns, betaSpawns, playerSpawn, scoreLimit = 40) {
+  const expandedWidth = width + MAP_PADDING * 2;
+  const expandedHeight = height + MAP_PADDING * 2;
+  const shiftedRings = rings.map((ring) => offsetRing(ring));
+  const shiftedLinks = links.map((link) => offsetBox(link));
+  const shiftedBlockers = blockers.map((blocker) => offsetBox(blocker));
+
   return {
     id,
     name,
     mode: 'TDM',
     scoreLimit,
-    grid: createLoopArena(width, height, rings, links, blockers),
-    playerSpawn,
-    teamSpawns: { alpha: alphaSpawns, beta: betaSpawns },
-    props: buildProps(width, height),
+    grid: createLoopArena(expandedWidth, expandedHeight, shiftedRings, shiftedLinks, shiftedBlockers),
+    playerSpawn: offsetPoint(playerSpawn),
+    teamSpawns: { alpha: alphaSpawns.map((spawn) => offsetPoint(spawn)), beta: betaSpawns.map((spawn) => offsetPoint(spawn)) },
+    props: buildProps(expandedWidth, expandedHeight),
   };
 }
 
