@@ -1,5 +1,5 @@
 import { Game } from './game.js';
-import { MAPS } from './data.js';
+import { MAPS, WEAPONS } from './data.js';
 
 const hud = {
   hp: document.getElementById('hudHp'),
@@ -14,8 +14,24 @@ const hud = {
 const menu = document.getElementById('menu');
 const gameWrap = document.getElementById('gameWrap');
 const canvas = document.getElementById('gameCanvas');
+const primarySelect = document.getElementById('primarySelect');
+const secondarySelect = document.getElementById('secondarySelect');
 let game;
 let selectedMapIndex = 0;
+
+function fillLoadoutSelect(select, slot, defaultId) {
+  const list = WEAPONS.filter((weapon) => weapon.slot === slot);
+  for (const weapon of list) {
+    const option = document.createElement('option');
+    option.value = weapon.id;
+    option.textContent = `${weapon.name} (${weapon.era})`;
+    select.append(option);
+  }
+  select.value = defaultId;
+}
+
+fillLoadoutSelect(primarySelect, 'primary', 'm4');
+fillLoadoutSelect(secondarySelect, 'secondary', 'glock');
 
 function startMatch() {
   menu.classList.add('hidden');
@@ -24,7 +40,13 @@ function startMatch() {
   const selectedMap = MAPS[selectedMapIndex % MAPS.length]?.id ?? 0;
   selectedMapIndex = (selectedMapIndex + 1) % MAPS.length;
 
-  game = new Game(canvas, hud, selectedMap);
+  game = new Game(canvas, hud, {
+    mapSelection: selectedMap,
+    loadout: {
+      primary: primarySelect.value,
+      secondary: secondarySelect.value,
+    },
+  });
   game.start();
 }
 
