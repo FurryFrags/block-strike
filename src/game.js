@@ -109,6 +109,91 @@ function createWeaponModel(id, materialOverride) {
   return root;
 }
 
+const DEFAULT_VIEW_POSE = {
+  leftForearm: { position: [-0.29, -0.45, -0.54], rotation: [-0.34, 0, 0] },
+  leftHand: { position: [-0.22, -0.64, -0.74], rotation: [-0.08, -0.16, 0.12] },
+  rightForearm: { position: [0.27, -0.42, -0.5], rotation: [-0.44, 0, 0] },
+  rightHand: { position: [0.25, -0.62, -0.66], rotation: [0.02, 0.04, -0.1] },
+  weapon: { position: [0.18, -0.59, -0.77], rotation: [-0.02, 0.04, -0.03] },
+};
+
+const WEAPON_HAND_POSES = {
+  ak47: {
+    leftHand: { position: [-0.17, -0.61, -0.86], rotation: [-0.14, -0.07, 0.18] },
+    weapon: { position: [0.17, -0.6, -0.82], rotation: [-0.02, 0.03, -0.04] },
+    world: { position: [0.02, 0.02, -0.24], rotation: [0.08, 0.04, 0], scale: 0.95 },
+  },
+  m4: {
+    leftHand: { position: [-0.16, -0.61, -0.88], rotation: [-0.12, -0.08, 0.16] },
+    weapon: { position: [0.16, -0.59, -0.84], rotation: [-0.01, 0.03, -0.03] },
+    world: { position: [0.02, 0.02, -0.25], rotation: [0.06, 0.03, 0], scale: 0.94 },
+  },
+  scar: {
+    leftHand: { position: [-0.18, -0.62, -0.88], rotation: [-0.14, -0.05, 0.2] },
+    weapon: { position: [0.17, -0.6, -0.83], rotation: [-0.02, 0.03, -0.05] },
+    world: { position: [0.02, 0.03, -0.25], rotation: [0.1, 0.04, 0], scale: 0.97 },
+  },
+  thompson: {
+    leftHand: { position: [-0.16, -0.63, -0.84], rotation: [-0.16, -0.08, 0.14] },
+    weapon: { position: [0.17, -0.61, -0.79], rotation: [-0.03, 0.04, -0.03] },
+    world: { position: [0.02, 0.03, -0.22], rotation: [0.12, 0.05, 0], scale: 0.94 },
+  },
+  mp40: {
+    leftHand: { position: [-0.16, -0.62, -0.82], rotation: [-0.15, -0.06, 0.14] },
+    weapon: { position: [0.17, -0.6, -0.78], rotation: [-0.03, 0.04, -0.04] },
+    world: { position: [0.02, 0.03, -0.22], rotation: [0.1, 0.04, 0], scale: 0.93 },
+  },
+  vector: {
+    leftHand: { position: [-0.16, -0.62, -0.79], rotation: [-0.11, -0.11, 0.12] },
+    weapon: { position: [0.18, -0.6, -0.75], rotation: [-0.03, 0.04, -0.03] },
+    world: { position: [0.02, 0.04, -0.21], rotation: [0.08, 0.04, 0], scale: 0.9 },
+  },
+  1911: {
+    leftForearm: { position: [-0.33, -0.49, -0.56], rotation: [-0.28, 0, -0.07] },
+    leftHand: { position: [-0.3, -0.65, -0.65], rotation: [0.3, -0.5, 0.36] },
+    rightHand: { position: [0.26, -0.63, -0.62], rotation: [0.1, 0.08, -0.16] },
+    weapon: { position: [0.2, -0.61, -0.72], rotation: [-0.01, 0.03, -0.06] },
+    world: { position: [0.01, 0.08, -0.18], rotation: [0.16, 0.04, 0], scale: 0.88 },
+  },
+  makarov: {
+    leftForearm: { position: [-0.33, -0.49, -0.56], rotation: [-0.28, 0, -0.07] },
+    leftHand: { position: [-0.3, -0.65, -0.65], rotation: [0.28, -0.48, 0.34] },
+    rightHand: { position: [0.26, -0.63, -0.62], rotation: [0.09, 0.08, -0.15] },
+    weapon: { position: [0.2, -0.61, -0.72], rotation: [-0.01, 0.04, -0.05] },
+    world: { position: [0.01, 0.08, -0.18], rotation: [0.16, 0.04, 0], scale: 0.88 },
+  },
+  glock: {
+    leftForearm: { position: [-0.33, -0.49, -0.56], rotation: [-0.28, 0, -0.08] },
+    leftHand: { position: [-0.3, -0.66, -0.65], rotation: [0.3, -0.5, 0.35] },
+    rightHand: { position: [0.26, -0.63, -0.62], rotation: [0.1, 0.08, -0.16] },
+    weapon: { position: [0.2, -0.62, -0.73], rotation: [-0.01, 0.03, -0.06] },
+    world: { position: [0.01, 0.08, -0.18], rotation: [0.16, 0.04, 0], scale: 0.89 },
+  },
+  dagger: {
+    leftForearm: { position: [-0.4, -0.52, -0.6], rotation: [-0.2, 0, -0.2] },
+    leftHand: { position: [-0.35, -0.67, -0.67], rotation: [0.1, -0.6, 0.62] },
+    rightForearm: { position: [0.3, -0.45, -0.56], rotation: [-0.3, 0.1, 0.08] },
+    rightHand: { position: [0.27, -0.64, -0.7], rotation: [0.36, 0.18, -0.2] },
+    weapon: { position: [0.21, -0.63, -0.71], rotation: [-0.95, -0.36, 0.42] },
+    world: { position: [0.04, -0.06, -0.22], rotation: [-0.45, 0.02, 0], scale: 0.9 },
+  },
+  frag: {
+    leftForearm: { position: [-0.25, -0.42, -0.52], rotation: [-0.25, 0, 0.08] },
+    leftHand: { position: [-0.22, -0.57, -0.62], rotation: [0.02, -0.2, 0.1] },
+    rightForearm: { position: [0.29, -0.47, -0.52], rotation: [-0.52, 0.1, -0.08] },
+    rightHand: { position: [0.24, -0.65, -0.63], rotation: [0.6, 0.06, -0.2] },
+    weapon: { position: [0.2, -0.59, -0.7], rotation: [0.2, 0.02, -0.02] },
+    world: { position: [0.03, 0.04, -0.18], rotation: [0.1, 0, 0], scale: 1 },
+  },
+};
+
+function applyPose(target, pose) {
+  if (!pose) return;
+  if (pose.position) target.position.set(...pose.position);
+  if (pose.rotation) target.rotation.set(...pose.rotation);
+  if (pose.scale) target.scale.setScalar(pose.scale);
+}
+
 export class Game {
   constructor(canvas, hud, options = 0) {
     this.canvas = canvas;
@@ -298,37 +383,42 @@ export class Game {
 
     this.weaponMesh = new THREE.Group();
 
-    this.leftForearm.position.set(-0.29, -0.45, -0.54);
-    this.leftForearm.rotation.x = -0.34;
-    this.leftHand.position.set(-0.22, -0.64, -0.74);
-    this.leftHand.rotation.set(-0.08, -0.16, 0.12);
-
-    this.rightForearm.position.set(0.27, -0.42, -0.5);
-    this.rightForearm.rotation.x = -0.44;
-    this.rightHand.position.set(0.25, -0.62, -0.66);
-    this.rightHand.rotation.set(0.02, 0.04, -0.1);
-
-    this.weaponMesh.position.set(0.18, -0.59, -0.77);
-    this.weaponMesh.rotation.set(-0.02, 0.04, -0.03);
+    applyPose(this.leftForearm, DEFAULT_VIEW_POSE.leftForearm);
+    applyPose(this.leftHand, DEFAULT_VIEW_POSE.leftHand);
+    applyPose(this.rightForearm, DEFAULT_VIEW_POSE.rightForearm);
+    applyPose(this.rightHand, DEFAULT_VIEW_POSE.rightHand);
+    applyPose(this.weaponMesh, DEFAULT_VIEW_POSE.weapon);
 
     this.viewModel.add(this.leftForearm, this.leftHand, this.rightForearm, this.rightHand, this.weaponMesh);
   }
 
   syncWeaponModel() {
+    const weaponId = this.weapon.def.id;
+    const pose = WEAPON_HAND_POSES[weaponId] ?? {};
+
+    applyPose(this.leftForearm, DEFAULT_VIEW_POSE.leftForearm);
+    applyPose(this.leftHand, DEFAULT_VIEW_POSE.leftHand);
+    applyPose(this.rightForearm, DEFAULT_VIEW_POSE.rightForearm);
+    applyPose(this.rightHand, DEFAULT_VIEW_POSE.rightHand);
+    applyPose(this.weaponMesh, DEFAULT_VIEW_POSE.weapon);
+
+    applyPose(this.leftForearm, pose.leftForearm);
+    applyPose(this.leftHand, pose.leftHand);
+    applyPose(this.rightForearm, pose.rightForearm);
+    applyPose(this.rightHand, pose.rightHand);
+    applyPose(this.weaponMesh, pose.weapon);
+
     this.weaponMesh.clear();
-    const model = createWeaponModel(this.weapon.def.id);
-    if (this.weapon.def.isMelee) {
-      model.rotation.set(-0.6, -0.3, 0.2);
-      model.position.set(-0.06, -0.02, -0.04);
-    }
+    const model = createWeaponModel(weaponId);
     this.weaponMesh.add(model);
 
     if (this.playerWeaponMount) {
       this.playerWeaponMount.clear();
-      const worldModel = createWeaponModel(this.weapon.def.id, new THREE.MeshStandardMaterial({ color: '#1f2329', metalness: 0.45, roughness: 0.4 }));
+      const worldModel = createWeaponModel(weaponId, new THREE.MeshStandardMaterial({ color: '#1f2329', metalness: 0.45, roughness: 0.4 }));
       worldModel.scale.setScalar(0.95);
       worldModel.position.set(0.02, 0.07, -0.2);
       worldModel.rotation.set(0.15, 0.05, 0);
+      applyPose(worldModel, pose.world);
       this.playerWeaponMount.add(worldModel);
     }
   }
