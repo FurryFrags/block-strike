@@ -60,6 +60,9 @@ export class Game {
     this.perspectiveIndex = 0;
     this.playerVerticalVelocity = 0;
     this.isPlayerGrounded = true;
+    this.playerMoveAmount = 0;
+    this.playerIsRunning = false;
+    this.playerWalkTime = Math.random() * Math.PI * 2;
 
     this.worldBlocks = [];
     this.wallBoxes = [];
@@ -223,17 +226,24 @@ export class Game {
     this.playerHead = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.34, 0.34), skin);
     this.playerHead.position.y = 1.93;
 
-    const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.54, 0.16), shirt);
-    leftArm.position.set(-0.36, 1.42, 0);
-    const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.54, 0.16), shirt);
-    rightArm.position.set(0.36, 1.42, 0);
+    this.playerLeftArm = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.54, 0.16), shirt);
+    this.playerLeftArm.position.set(-0.36, 1.42, 0);
+    this.playerRightArm = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.54, 0.16), shirt);
+    this.playerRightArm.position.set(0.36, 1.42, 0);
 
-    const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.62, 0.2), pants);
-    leftLeg.position.set(-0.14, 0.8, 0);
-    const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.62, 0.2), pants);
-    rightLeg.position.set(0.14, 0.8, 0);
+    this.playerLeftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.62, 0.2), pants);
+    this.playerLeftLeg.position.set(-0.14, 0.8, 0);
+    this.playerRightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.62, 0.2), pants);
+    this.playerRightLeg.position.set(0.14, 0.8, 0);
 
-    this.playerBody.add(torso, this.playerHead, leftArm, rightArm, leftLeg, rightLeg);
+    this.playerBody.add(
+      torso,
+      this.playerHead,
+      this.playerLeftArm,
+      this.playerRightArm,
+      this.playerLeftLeg,
+      this.playerRightLeg,
+    );
     this.cameraRig.add(this.playerBody);
   }
 
@@ -344,6 +354,7 @@ export class Game {
 
     this.updateLook();
     this.updateMovement(dt);
+    this.animatePlayerModel(dt);
     if (this.isFiring) this.fireWeapon();
 
     this.updateBots(dt);
@@ -377,9 +388,14 @@ export class Game {
     if (velocity.lengthSq() > 0) velocity.normalize();
 
     const speed = 4.4 * (this.keys.has('shift') ? 1.5 : 1);
+    const prevX = this.playerPos.x;
+    const prevZ = this.playerPos.z;
     const next = this.playerPos.clone().addScaledVector(velocity, speed * dt);
     this.tryMove(next.x, this.playerPos.z);
     this.tryMove(this.playerPos.x, next.z);
+    const movedDist = Math.hypot(this.playerPos.x - prevX, this.playerPos.z - prevZ);
+    this.playerMoveAmount = clamp(movedDist / Math.max(dt * 6.4, 0.0001), 0, 1);
+    this.playerIsRunning = this.keys.has('shift') && this.playerMoveAmount > 0.1;
 
     const isJumpPressed = this.keys.has(' ');
     if (isJumpPressed && this.isPlayerGrounded) {
@@ -396,6 +412,23 @@ export class Game {
     }
 
     this.cameraRig.position.set(this.playerPos.x, this.playerPos.y, this.playerPos.z);
+  }
+
+  animatePlayerModel(dt) {
+    this.playerWalkTime += dt * (this.playerIsRunning ? 12 : 8);
+    const walkStrength = this.playerMoveAmount;
+    const sway = Math.sin(this.playerWalkTime) * 0.55 * walkStrength;
+
+    this.playerLeftLeg.rotation.x = sway;
+    this.playerRightLeg.rotation.x = -sway;
+    this.playerLeftArm.rotation.x = -sway * 0.75;
+    this.playerRightArm.rotation.x = sway * 0.75;
+
+    const headYawOffset = this.perspectiveName === 'third-person-front' ? Math.PI : 0;
+    const headYaw = headYawOffset;
+    const pitchSign = this.perspectiveName === 'third-person-front' ? -1 : 1;
+    this.playerHead.rotation.y = headYaw;
+    this.playerHead.rotation.x = clamp(this.pitchPivot.rotation.x * pitchSign, -0.8, 0.8);
   }
 
   tryMove(nx, nz) {
