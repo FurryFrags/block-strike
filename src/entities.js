@@ -57,6 +57,13 @@ function createPivotLimb(size, color, pivotY) {
   return { pivot, mesh };
 }
 
+const MC_PIXEL = 0.065;
+const MODEL = {
+  torso: { x: MC_PIXEL * 8, y: MC_PIXEL * 12, z: MC_PIXEL * 4 },
+  limb: { x: MC_PIXEL * 4, y: MC_PIXEL * 12, z: MC_PIXEL * 4 },
+  head: MC_PIXEL * 8 * 0.95,
+};
+
 const TEAM_PALETTES = {
   alpha: { torso: '#3b74a5', arms: '#2c5a82' },
   beta: { torso: '#a94d47', arms: '#853835' },
@@ -78,24 +85,24 @@ export class BotCharacter {
 
     const palette = TEAM_PALETTES[team] ?? TEAM_PALETTES.beta;
 
-    const torso = limb({ x: 0.52, y: 0.72, z: 0.26 }, palette.torso);
+    const torso = limb(MODEL.torso, palette.torso);
     torso.position.y = 1.45;
-    const head = limb({ x: 0.42, y: 0.42, z: 0.42 }, '#e7b99a');
-    head.position.y = 2.02;
+    const head = limb({ x: MODEL.head, y: MODEL.head, z: MODEL.head }, '#e7b99a');
+    head.position.y = 2.07;
 
-    const leftArm = createPivotLimb({ x: 0.16, y: 0.74, z: 0.16 }, palette.arms, 1.78);
-    leftArm.pivot.position.x = -0.34;
+    const leftArm = createPivotLimb(MODEL.limb, palette.arms, 1.84);
+    leftArm.pivot.position.x = -0.39;
     this.leftArm = leftArm.pivot;
 
-    const rightArm = createPivotLimb({ x: 0.16, y: 0.74, z: 0.16 }, palette.arms, 1.78);
-    rightArm.pivot.position.x = 0.34;
+    const rightArm = createPivotLimb(MODEL.limb, palette.arms, 1.84);
+    rightArm.pivot.position.x = 0.39;
     this.rightArm = rightArm.pivot;
 
-    const leftLeg = createPivotLimb({ x: 0.18, y: 0.72, z: 0.18 }, '#28313a', 1.1);
+    const leftLeg = createPivotLimb(MODEL.limb, '#28313a', 1.1);
     leftLeg.pivot.position.x = -0.13;
     this.leftLeg = leftLeg.pivot;
 
-    const rightLeg = createPivotLimb({ x: 0.18, y: 0.72, z: 0.18 }, '#28313a', 1.1);
+    const rightLeg = createPivotLimb(MODEL.limb, '#28313a', 1.1);
     rightLeg.pivot.position.x = 0.13;
     this.rightLeg = rightLeg.pivot;
 

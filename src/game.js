@@ -11,6 +11,12 @@ const GRAVITY = -22;
 const BOT_GROUND_Y = -0.49;
 const BOT_SPAWN_Y = BOT_GROUND_Y + 1.2;
 const PERSPECTIVES = ['first-person', 'third-person-back', 'third-person-front'];
+const MC_PIXEL = 0.065;
+const MODEL = {
+  torso: { x: MC_PIXEL * 8, y: MC_PIXEL * 12, z: MC_PIXEL * 4 },
+  limb: { x: MC_PIXEL * 4, y: MC_PIXEL * 12, z: MC_PIXEL * 4 },
+  head: MC_PIXEL * 8 * 0.95,
+};
 
 function clamp(v, lo, hi) {
   return Math.min(hi, Math.max(lo, v));
@@ -230,19 +236,19 @@ export class Game {
       return pivot;
     };
 
-    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.72, 0.26), shirt);
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(MODEL.torso.x, MODEL.torso.y, MODEL.torso.z), shirt);
     torso.position.y = 1.45;
-    this.playerHead = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.42), skin);
-    this.playerHead.position.y = 2.02;
+    this.playerHead = new THREE.Mesh(new THREE.BoxGeometry(MODEL.head, MODEL.head, MODEL.head), skin);
+    this.playerHead.position.y = 2.07;
 
-    this.playerLeftArm = createPivotLimb({ x: 0.16, y: 0.74, z: 0.16 }, shirt, 1.78);
-    this.playerLeftArm.position.x = -0.34;
-    this.playerRightArm = createPivotLimb({ x: 0.16, y: 0.74, z: 0.16 }, shirt, 1.78);
-    this.playerRightArm.position.x = 0.34;
+    this.playerLeftArm = createPivotLimb(MODEL.limb, shirt, 1.84);
+    this.playerLeftArm.position.x = -0.39;
+    this.playerRightArm = createPivotLimb(MODEL.limb, shirt, 1.84);
+    this.playerRightArm.position.x = 0.39;
 
-    this.playerLeftLeg = createPivotLimb({ x: 0.18, y: 0.72, z: 0.18 }, pants, 1.1);
+    this.playerLeftLeg = createPivotLimb(MODEL.limb, pants, 1.1);
     this.playerLeftLeg.position.x = -0.13;
-    this.playerRightLeg = createPivotLimb({ x: 0.18, y: 0.72, z: 0.18 }, pants, 1.1);
+    this.playerRightLeg = createPivotLimb(MODEL.limb, pants, 1.1);
     this.playerRightLeg.position.x = 0.13;
 
     this.playerBody.add(
