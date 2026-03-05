@@ -26,13 +26,106 @@ function dist2d(ax, az, bx, bz) {
   return Math.hypot(ax - bx, az - bz);
 }
 
+function weaponById(id, fallbackSlot = 'primary') {
+  return WEAPONS.find((weapon) => weapon.id === id)
+    ?? WEAPONS.find((weapon) => weapon.slot === fallbackSlot)
+    ?? WEAPONS[0];
+}
+
+function createWeaponModel(id, materialOverride) {
+  const mat = materialOverride ?? new THREE.MeshStandardMaterial({ color: '#20242b', metalness: 0.5, roughness: 0.38 });
+  const root = new THREE.Group();
+  const part = (w, h, d, x, y, z, rotX = 0, rotY = 0, rotZ = 0) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    mesh.position.set(x, y, z);
+    mesh.rotation.set(rotX, rotY, rotZ);
+    root.add(mesh);
+  };
+
+  if (id === 'dagger') {
+    part(0.05, 0.08, 0.2, 0, -0.02, 0.2);
+    part(0.03, 0.03, 0.7, 0, 0.02, -0.25);
+    part(0.02, 0.04, 0.24, 0, 0.02, -0.68, -0.1);
+    return root;
+  }
+
+  if (id === 'frag') {
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 10), mat);
+    const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.12, 8), mat);
+    pin.position.set(0, 0.14, 0);
+    root.add(body, pin);
+    return root;
+  }
+
+  const rifleCore = () => {
+    part(0.18, 0.18, 0.92, 0, 0, -0.08);
+    part(0.1, 0.08, 0.7, 0, 0.04, -0.82);
+    part(0.12, 0.16, 0.34, 0, -0.02, 0.4);
+    part(0.08, 0.22, 0.18, 0, -0.15, 0.1, -0.2);
+  };
+
+  const pistolCore = () => {
+    part(0.12, 0.12, 0.48, 0, 0.02, -0.08);
+    part(0.07, 0.16, 0.14, 0, -0.11, 0.07, -0.3);
+    part(0.06, 0.06, 0.18, 0, 0.05, -0.44);
+  };
+
+  switch (id) {
+    case 'ak47':
+      rifleCore();
+      part(0.07, 0.2, 0.22, 0, -0.18, -0.08, 0.35);
+      part(0.06, 0.06, 0.32, 0, 0.03, -1.02);
+      break;
+    case 'scar':
+      rifleCore();
+      part(0.11, 0.12, 0.32, 0, 0.15, -0.1);
+      part(0.06, 0.06, 0.34, 0, 0.03, -1.02);
+      break;
+    case 'vector':
+      part(0.16, 0.2, 0.52, 0, 0.01, -0.02);
+      part(0.09, 0.14, 0.16, 0, -0.12, 0.08);
+      part(0.06, 0.08, 0.28, 0, 0.03, -0.45);
+      part(0.06, 0.18, 0.12, 0, -0.12, -0.1);
+      break;
+    case 'thompson':
+      rifleCore();
+      part(0.1, 0.1, 0.22, 0, -0.16, -0.02);
+      break;
+    case 'mp40':
+      part(0.16, 0.16, 0.72, 0, 0.01, -0.05);
+      part(0.08, 0.2, 0.18, 0, -0.14, -0.08);
+      part(0.06, 0.06, 0.26, 0, 0.03, -0.75);
+      break;
+    case '1911':
+    case 'makarov':
+    case 'glock':
+      pistolCore();
+      if (id === 'glock') part(0.07, 0.1, 0.2, 0, 0.1, -0.15);
+      break;
+    default:
+      rifleCore();
+  }
+
+  return root;
+}
+
 export class Game {
-  constructor(canvas, hud, mapSelection = 0) {
+  constructor(canvas, hud, options = 0) {
     this.canvas = canvas;
     this.hud = hud;
-    this.map = Game.resolveMap(mapSelection);
-    this.weaponIndex = 3;
-    this.weapon = new WeaponState(WEAPONS[this.weaponIndex]);
+
+    const config = typeof options === 'object' && options !== null ? options : { mapSelection: options };
+    this.map = Game.resolveMap(config.mapSelection ?? 0);
+
+    const loadout = config.loadout ?? {};
+    this.weaponSlots = {
+      primary: weaponById(loadout.primary, 'primary'),
+      secondary: weaponById(loadout.secondary, 'secondary'),
+      dagger: weaponById('dagger', 'melee'),
+    };
+    this.currentSlot = 'primary';
+    this.weapon = new WeaponState(this.weaponSlots.primary);
+    this.grenadeState = new WeaponState(weaponById('frag', 'grenade'));
     this.score = 0;
     this.hp = 100;
     this.roundTime = 240;
@@ -80,6 +173,7 @@ export class Game {
     this.spawnPlayer();
     this.spawnBots();
     this.buildViewModel();
+    this.syncWeaponModel();
     this.bind();
   }
 
@@ -195,17 +289,13 @@ export class Game {
 
     const skin = new THREE.MeshStandardMaterial({ color: '#e6b391', roughness: 0.65 });
     const sleeve = new THREE.MeshStandardMaterial({ color: '#2c4b67', roughness: 0.8 });
-    const gunMat = new THREE.MeshStandardMaterial({ color: '#212428', metalness: 0.45, roughness: 0.45 });
 
     this.leftForearm = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.42, 0.18), sleeve);
     this.leftHand = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.16), skin);
     this.rightForearm = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.44, 0.18), sleeve);
     this.rightHand = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.16), skin);
 
-    this.weaponMesh = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.22, 0.95), gunMat);
-    const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.72), gunMat);
-    barrel.position.set(0, 0.05, -0.75);
-    this.weaponMesh.add(barrel);
+    this.weaponMesh = new THREE.Group();
 
     this.leftForearm.position.set(-0.34, -0.45, -0.55);
     this.leftForearm.rotation.x = -0.42;
@@ -218,6 +308,16 @@ export class Game {
     this.weaponMesh.position.set(0.18, -0.61, -0.72);
 
     this.viewModel.add(this.leftForearm, this.leftHand, this.rightForearm, this.rightHand, this.weaponMesh);
+  }
+
+  syncWeaponModel() {
+    this.weaponMesh.clear();
+    const model = createWeaponModel(this.weapon.def.id);
+    if (this.weapon.def.isMelee) {
+      model.rotation.set(-0.6, -0.3, 0.2);
+      model.position.set(-0.06, -0.02, -0.04);
+    }
+    this.weaponMesh.add(model);
   }
 
   buildPlayerModel() {
@@ -302,8 +402,10 @@ export class Game {
       this.keys.add(k);
       if (e.code === 'Space') e.preventDefault();
       if (k === 'r') this.weapon.startReload();
-      if (k === 'e') this.cycleWeapon(1);
-      if (k === 'q') this.cycleWeapon(-1);
+      if (k === '1') this.selectWeaponSlot('primary');
+      if (k === '2') this.selectWeaponSlot('secondary');
+      if (k === '3') this.selectWeaponSlot('dagger');
+      if (k === 'q') this.throwGrenade();
       if (k === 'p') this.cyclePerspective();
       if (k === 'escape') document.exitPointerLock();
     };
@@ -357,15 +459,36 @@ export class Game {
     requestAnimationFrame(this.loop);
   };
 
-  cycleWeapon(dir) {
-    this.weaponIndex = (this.weaponIndex + dir + WEAPONS.length) % WEAPONS.length;
-    this.weapon = new WeaponState(WEAPONS[this.weaponIndex]);
+  selectWeaponSlot(slot) {
+    const weaponDef = this.weaponSlots[slot];
+    if (!weaponDef || this.currentSlot === slot) return;
+    this.currentSlot = slot;
+    this.weapon = new WeaponState(weaponDef);
+    this.syncWeaponModel();
+  }
+
+  throwGrenade() {
+    if (!this.grenadeState.fire()) return;
+
+    for (const bot of this.bots) {
+      if (!bot.alive || bot.team === this.team) continue;
+      const d = dist2d(this.playerPos.x, this.playerPos.z, bot.group.position.x, bot.group.position.z);
+      if (d <= this.grenadeState.def.splash) {
+        bot.hp = Math.max(0, bot.hp - this.grenadeState.def.damage);
+        if (!bot.alive) {
+          this.teamScores.alpha += 1;
+          bot.group.visible = false;
+          this.respawnBot(bot);
+        }
+      }
+    }
   }
 
   update(dt) {
     this.roundTime = Math.max(0, this.roundTime - dt);
     this.damageFlash = Math.max(0, this.damageFlash - dt * 1.8);
     this.weapon.update(dt);
+    this.grenadeState.update(dt);
 
     this.updateLook();
     this.updateMovement(dt);
@@ -464,6 +587,29 @@ export class Game {
 
   fireWeapon() {
     if (!this.weapon.fire()) return;
+
+    if (this.weapon.def.isMelee) {
+      let closest = null;
+      let closestDist = Infinity;
+      for (const bot of this.bots) {
+        if (!bot.alive || bot.team === this.team) continue;
+        const d = dist2d(this.playerPos.x, this.playerPos.z, bot.group.position.x, bot.group.position.z);
+        if (d < this.weapon.def.range && d < closestDist) {
+          closest = bot;
+          closestDist = d;
+        }
+      }
+      if (closest) {
+        closest.hp = Math.max(0, closest.hp - this.weapon.def.damage);
+        if (!closest.alive) {
+          this.score += 1;
+          this.teamScores.alpha += 1;
+          closest.group.visible = false;
+          this.respawnBot(closest);
+        }
+      }
+      return;
+    }
 
     const dir = new THREE.Vector3();
     this.camera.getWorldDirection(dir);
@@ -601,7 +747,9 @@ export class Game {
     this.score = 0;
     this.roundTime = 240;
     this.teamScores = { alpha: 0, beta: 0 };
-    this.weapon = new WeaponState(WEAPONS[this.weaponIndex]);
+    this.weapon = new WeaponState(this.weaponSlots[this.currentSlot]);
+    this.grenadeState = new WeaponState(weaponById('frag', 'grenade'));
+    this.syncWeaponModel();
     this.spawnPlayer();
     for (const bot of this.bots) this.scene.remove(bot.group);
     this.spawnBots();
@@ -609,7 +757,8 @@ export class Game {
 
   updateHud() {
     this.hud.weapon.textContent = `${this.weapon.def.name} (${this.weapon.def.era})`;
-    this.hud.ammo.textContent = `${this.weapon.mag}/${this.weapon.reserve}`;
+    const ammoText = this.weapon.def.isMelee ? '∞' : `${this.weapon.mag}/${this.weapon.reserve}`;
+    this.hud.ammo.textContent = `${ammoText} • G ${this.grenadeState.mag + this.grenadeState.reserve}`;
     this.hud.hp.textContent = String(Math.ceil(this.hp));
     this.hud.kills.textContent = `${this.teamScores.alpha}`;
     this.hud.enemies.textContent = `${this.teamScores.beta}`;

@@ -1,10 +1,17 @@
 export const WEAPONS = [
-  { id: 'thompson', era: 'WW2', name: 'Thompson M1A1', damage: 19, fireRate: 9.2, magSize: 30, reserve: 150, reload: 2.3, spread: 0.02, range: 45 },
-  { id: 'mp40', era: 'WW2', name: 'MP40', damage: 21, fireRate: 8.1, magSize: 32, reserve: 160, reload: 2.5, spread: 0.018, range: 44 },
-  { id: 'ak47', era: 'Cold War', name: 'AK-47', damage: 33, fireRate: 6.2, magSize: 30, reserve: 120, reload: 2.7, spread: 0.012, range: 60 },
-  { id: 'm4', era: 'Modern', name: 'M4A1', damage: 28, fireRate: 8.5, magSize: 30, reserve: 150, reload: 2.2, spread: 0.01, range: 62 },
-  { id: 'scar', era: 'Modern', name: 'SCAR-H', damage: 36, fireRate: 5.4, magSize: 20, reserve: 100, reload: 2.4, spread: 0.009, range: 65 },
-  { id: 'vector', era: 'Modern', name: 'Vector .45', damage: 20, fireRate: 12.5, magSize: 25, reserve: 175, reload: 2.0, spread: 0.016, range: 40 },
+  { id: 'thompson', slot: 'primary', era: 'WW2', name: 'Thompson M1A1', damage: 19, fireRate: 9.2, magSize: 30, reserve: 150, reload: 2.3, spread: 0.02, range: 45 },
+  { id: 'mp40', slot: 'primary', era: 'WW2', name: 'MP40', damage: 21, fireRate: 8.1, magSize: 32, reserve: 160, reload: 2.5, spread: 0.018, range: 44 },
+  { id: 'ak47', slot: 'primary', era: 'Cold War', name: 'AK-47', damage: 33, fireRate: 6.2, magSize: 30, reserve: 120, reload: 2.7, spread: 0.012, range: 60 },
+  { id: 'm4', slot: 'primary', era: 'Modern', name: 'M4A1', damage: 28, fireRate: 8.5, magSize: 30, reserve: 150, reload: 2.2, spread: 0.01, range: 62 },
+  { id: 'scar', slot: 'primary', era: 'Modern', name: 'SCAR-H', damage: 36, fireRate: 5.4, magSize: 20, reserve: 100, reload: 2.4, spread: 0.009, range: 65 },
+  { id: 'vector', slot: 'primary', era: 'Modern', name: 'Vector .45', damage: 20, fireRate: 12.5, magSize: 25, reserve: 175, reload: 2.0, spread: 0.016, range: 40 },
+
+  { id: '1911', slot: 'secondary', era: 'WW2', name: 'M1911', damage: 34, fireRate: 4.1, magSize: 8, reserve: 56, reload: 1.5, spread: 0.013, range: 32 },
+  { id: 'makarov', slot: 'secondary', era: 'Cold War', name: 'Makarov', damage: 30, fireRate: 4.6, magSize: 8, reserve: 64, reload: 1.4, spread: 0.014, range: 30 },
+  { id: 'glock', slot: 'secondary', era: 'Modern', name: 'Glock 17', damage: 27, fireRate: 5.2, magSize: 17, reserve: 85, reload: 1.3, spread: 0.012, range: 35 },
+
+  { id: 'dagger', slot: 'melee', era: 'All', name: 'Combat Dagger', damage: 68, fireRate: 1.4, magSize: 1, reserve: 1, reload: 0, spread: 0, range: 2.4, isMelee: true },
+  { id: 'frag', slot: 'grenade', era: 'All', name: 'Frag Grenade', damage: 95, fireRate: 0.65, magSize: 1, reserve: 2, reload: 0, spread: 0, range: 11, isGrenade: true, splash: 4.2 },
 ];
 
 function createLoopArena(width, height, rings = [], links = [], blockers = []) {

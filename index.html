@@ -8,16 +8,35 @@
 </head>
 <body>
   <div id="menu" class="screen">
-    <div class="panel">
-      <h1>BLOCK STRIKE: VOXEL FRONTLINE</h1>
-      <p>Minecraft-style fast FPS sandbox with weapons spanning WW2 to the modern era.</p>
-      <ul>
-        <li>WASD to move, mouse to look</li>
-        <li>Left click to fire, R reload</li>
-        <li>Q / E swaps weapon era</li>
-        <li>Shift to sprint</li>
-        <li>P cycles perspective</li>
-      </ul>
+    <div class="panel homepage">
+      <div>
+        <h1>BLOCK STRIKE: VOXEL FRONTLINE</h1>
+        <p class="tagline">Deploy into a voxel warzone with modern, cold-war, and WW2 arsenals.</p>
+      </div>
+
+      <div class="home-grid">
+        <section>
+          <h2>Match Briefing</h2>
+          <ul>
+            <li>WASD move, mouse aim, left click fire.</li>
+            <li>Press <strong>1/2/3</strong> for Primary, Secondary, Dagger.</li>
+            <li>Press <strong>Q</strong> to throw grenade.</li>
+            <li>R reload, Shift sprint, P perspective.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Loadout</h2>
+          <label for="primarySelect">Primary</label>
+          <select id="primarySelect"></select>
+
+          <label for="secondarySelect">Secondary</label>
+          <select id="secondarySelect"></select>
+
+          <p class="note">Slot 3 is always Combat Dagger. Tactical: Frag Grenade.</p>
+        </section>
+      </div>
+
       <button id="playBtn">Deploy</button>
     </div>
   </div>

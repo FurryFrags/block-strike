@@ -3,8 +3,8 @@ import * as THREE from 'https://unpkg.com/three@0.164.1/build/three.module.js';
 export class WeaponState {
   constructor(def) {
     this.def = def;
-    this.mag = def.magSize;
-    this.reserve = def.reserve;
+    this.mag = def.isMelee ? Infinity : def.magSize;
+    this.reserve = def.isMelee ? Infinity : def.reserve;
     this.cooldown = 0;
     this.reloadLeft = 0;
   }
@@ -29,7 +29,25 @@ export class WeaponState {
   }
 
   fire() {
-    if (this.cooldown > 0 || this.reloadLeft > 0 || this.mag <= 0) return false;
+    if (this.cooldown > 0 || this.reloadLeft > 0) return false;
+
+    if (this.def.isMelee) {
+      this.cooldown = 1 / this.def.fireRate;
+      return true;
+    }
+
+    if (this.def.isGrenade) {
+      if (this.mag + this.reserve <= 0) return false;
+      if (this.mag <= 0 && this.reserve > 0) {
+        this.mag = 1;
+        this.reserve -= 1;
+      }
+      this.mag -= 1;
+      this.cooldown = 1 / this.def.fireRate;
+      return true;
+    }
+
+    if (this.mag <= 0) return false;
     this.mag -= 1;
     this.cooldown = 1 / this.def.fireRate;
     return true;
