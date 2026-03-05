@@ -3,7 +3,9 @@ import { MAPS, WEAPONS, wallAt } from './data.js';
 import { BotCharacter, WeaponState } from './entities.js';
 
 const PLAYER_RADIUS = 0.28;
-const PLAYER_HEAD_Y = 1.74;
+const PLAYER_GROUND_Y = 0;
+const PLAYER_HEAD_Y = 1.93;
+const PLAYER_JUMP_SPEED = 8.4;
 const BOT_RADIUS = 0.3;
 const GRAVITY = -22;
 const BOT_GROUND_Y = -0.49;
@@ -56,6 +58,8 @@ export class Game {
     this.isFiring = false;
     this.damageFlash = 0;
     this.perspectiveIndex = 0;
+    this.playerVerticalVelocity = 0;
+    this.isPlayerGrounded = true;
 
     this.worldBlocks = [];
     this.wallBoxes = [];
@@ -145,7 +149,9 @@ export class Game {
 
   spawnPlayer() {
     const safeSpawn = this.findSafeSpawn(this.map.playerSpawn);
-    this.playerPos = new THREE.Vector3(safeSpawn.x, 0, safeSpawn.y);
+    this.playerPos = new THREE.Vector3(safeSpawn.x, PLAYER_GROUND_Y, safeSpawn.y);
+    this.playerVerticalVelocity = 0;
+    this.isPlayerGrounded = true;
     this.cameraRig.position.copy(this.playerPos);
     this.cameraRig.rotation.y = this.map.playerSpawn.dir;
     this.pitchPivot.rotation.x = 0;
@@ -242,17 +248,18 @@ export class Game {
 
   updateCameraPerspective() {
     if (this.perspectiveName === 'first-person') {
-      this.camera.position.set(0, PLAYER_HEAD_Y, 0);
+      this.camera.position.set(0, this.playerHead.position.y, 0);
       this.camera.rotation.set(0, 0, 0);
       if (this.viewModel) this.viewModel.visible = true;
-      this.playerHead.visible = false;
+      this.playerBody.visible = false;
       return;
     }
 
     const isFront = this.perspectiveName === 'third-person-front';
-    this.camera.position.set(0, PLAYER_HEAD_Y + 0.35, isFront ? -3.2 : 3.2);
+    this.camera.position.set(0, this.playerHead.position.y + 0.35, isFront ? -3.2 : 3.2);
     this.camera.rotation.set(0, isFront ? Math.PI : 0, 0);
     if (this.viewModel) this.viewModel.visible = false;
+    this.playerBody.visible = true;
     this.playerHead.visible = true;
   }
 
@@ -268,6 +275,7 @@ export class Game {
     this.onKeyDown = (e) => {
       const k = e.key.toLowerCase();
       this.keys.add(k);
+      if (e.code === 'Space') e.preventDefault();
       if (k === 'r') this.weapon.startReload();
       if (k === 'e') this.cycleWeapon(1);
       if (k === 'q') this.cycleWeapon(-1);
@@ -373,7 +381,21 @@ export class Game {
     this.tryMove(next.x, this.playerPos.z);
     this.tryMove(this.playerPos.x, next.z);
 
-    this.cameraRig.position.set(this.playerPos.x, 0, this.playerPos.z);
+    const isJumpPressed = this.keys.has(' ');
+    if (isJumpPressed && this.isPlayerGrounded) {
+      this.playerVerticalVelocity = PLAYER_JUMP_SPEED;
+      this.isPlayerGrounded = false;
+    }
+
+    this.playerVerticalVelocity += GRAVITY * dt;
+    this.playerPos.y += this.playerVerticalVelocity * dt;
+    if (this.playerPos.y <= PLAYER_GROUND_Y) {
+      this.playerPos.y = PLAYER_GROUND_Y;
+      this.playerVerticalVelocity = 0;
+      this.isPlayerGrounded = true;
+    }
+
+    this.cameraRig.position.set(this.playerPos.x, this.playerPos.y, this.playerPos.z);
   }
 
   tryMove(nx, nz) {
