@@ -166,6 +166,7 @@ export class Game {
     this.worldBlocks = [];
     this.wallBoxes = [];
     this.bots = [];
+    this.tracers = [];
     this.raycaster = new THREE.Raycaster();
 
     this.buildWorld();
@@ -297,15 +298,18 @@ export class Game {
 
     this.weaponMesh = new THREE.Group();
 
-    this.leftForearm.position.set(-0.34, -0.45, -0.55);
-    this.leftForearm.rotation.x = -0.42;
-    this.leftHand.position.set(-0.34, -0.69, -0.52);
+    this.leftForearm.position.set(-0.29, -0.45, -0.54);
+    this.leftForearm.rotation.x = -0.34;
+    this.leftHand.position.set(-0.22, -0.64, -0.74);
+    this.leftHand.rotation.set(-0.08, -0.16, 0.12);
 
-    this.rightForearm.position.set(0.32, -0.44, -0.47);
-    this.rightForearm.rotation.x = -0.5;
-    this.rightHand.position.set(0.3, -0.68, -0.42);
+    this.rightForearm.position.set(0.27, -0.42, -0.5);
+    this.rightForearm.rotation.x = -0.44;
+    this.rightHand.position.set(0.25, -0.62, -0.66);
+    this.rightHand.rotation.set(0.02, 0.04, -0.1);
 
-    this.weaponMesh.position.set(0.18, -0.61, -0.72);
+    this.weaponMesh.position.set(0.18, -0.59, -0.77);
+    this.weaponMesh.rotation.set(-0.02, 0.04, -0.03);
 
     this.viewModel.add(this.leftForearm, this.leftHand, this.rightForearm, this.rightHand, this.weaponMesh);
   }
@@ -318,6 +322,15 @@ export class Game {
       model.position.set(-0.06, -0.02, -0.04);
     }
     this.weaponMesh.add(model);
+
+    if (this.playerWeaponMount) {
+      this.playerWeaponMount.clear();
+      const worldModel = createWeaponModel(this.weapon.def.id, new THREE.MeshStandardMaterial({ color: '#1f2329', metalness: 0.45, roughness: 0.4 }));
+      worldModel.scale.setScalar(0.95);
+      worldModel.position.set(0.02, 0.07, -0.2);
+      worldModel.rotation.set(0.15, 0.05, 0);
+      this.playerWeaponMount.add(worldModel);
+    }
   }
 
   buildPlayerModel() {
@@ -345,6 +358,11 @@ export class Game {
     this.playerLeftArm.position.x = -0.39;
     this.playerRightArm = createPivotLimb(MODEL.limb, shirt, 1.84);
     this.playerRightArm.position.x = 0.39;
+
+    this.playerWeaponMount = new THREE.Group();
+    this.playerWeaponMount.position.set(0.02, -0.3, -0.28);
+    this.playerWeaponMount.rotation.set(-0.2, 0.05, 0);
+    this.playerRightArm.add(this.playerWeaponMount);
 
     this.playerLeftLeg = createPivotLimb(MODEL.limb, pants, 1.1);
     this.playerLeftLeg.position.x = -0.13;
@@ -496,6 +514,7 @@ export class Game {
     if (this.isFiring) this.fireWeapon();
 
     this.updateBots(dt);
+    this.updateTracers(dt);
     this.animateViewModel();
 
     if (this.hp <= 0 || this.roundTime <= 0 || this.teamScores.alpha >= this.scoreLimit || this.teamScores.beta >= this.scoreLimit) this.resetRound();
@@ -559,8 +578,10 @@ export class Game {
 
     this.playerLeftLeg.rotation.x = sway;
     this.playerRightLeg.rotation.x = -sway;
-    this.playerLeftArm.rotation.x = -sway * 0.75;
-    this.playerRightArm.rotation.x = sway * 0.75;
+    this.playerLeftArm.rotation.x = -0.32 - sway * 0.42;
+    this.playerLeftArm.rotation.z = -0.14;
+    this.playerRightArm.rotation.x = -0.58 + sway * 0.22;
+    this.playerRightArm.rotation.z = 0.08;
 
     const headYawOffset = this.perspectiveName === 'third-person-front' ? Math.PI : 0;
     const headYaw = headYawOffset;
@@ -618,12 +639,15 @@ export class Game {
     dir.z += (Math.random() - 0.5) * this.weapon.def.spread;
     dir.normalize();
 
-    this.raycaster.set(this.camera.getWorldPosition(new THREE.Vector3()), dir);
+    const shotOrigin = this.camera.getWorldPosition(new THREE.Vector3());
+    this.raycaster.set(shotOrigin, dir);
     this.raycaster.far = this.weapon.def.range;
 
     const targets = this.bots.filter((b) => b.alive && b.team !== this.team).map((b) => b.group);
     const hits = this.raycaster.intersectObjects(targets, true);
+    const shotEnd = shotOrigin.clone().addScaledVector(dir, this.weapon.def.range);
     if (hits.length > 0) {
+      shotEnd.copy(hits[0].point);
       const root = hits[0].object.parent;
       const bot = this.bots.find((b) => b.group === root || b.group.children.includes(root));
       if (bot) {
@@ -636,6 +660,7 @@ export class Game {
         }
       }
     }
+    this.spawnTracer(shotOrigin, shotEnd, this.team === 'alpha' ? '#ffe7a8' : '#ffb9b2');
   }
 
   updateBots(dt) {
@@ -662,9 +687,47 @@ export class Game {
         bot.animateWalk(performance.now() * 0.001, moveStep > 0 ? 1 : 0.2);
 
         if (d < 9 && bot.attackCooldown === 0 && this.canSeeTarget(botPos, target)) {
+          const muzzleOrigin = bot.gunMuzzle
+            ? bot.gunMuzzle.getWorldPosition(new THREE.Vector3())
+            : new THREE.Vector3(botPos.x, 1.35, botPos.z);
+          const targetPoint = target.type === 'player'
+            ? new THREE.Vector3(target.x, this.playerPos.y + PLAYER_HEAD_Y - 0.15, target.z)
+            : new THREE.Vector3(target.x, 1.45, target.z);
+          this.spawnTracer(muzzleOrigin, targetPoint, bot.team === 'alpha' ? '#b8d9ff' : '#ffb8b8');
           this.applyDamage(target, 8);
           bot.attackCooldown = 0.5 + Math.random() * 0.55;
         }
+      }
+    }
+  }
+
+
+  spawnTracer(start, end, color = '#ffd592') {
+    const delta = end.clone().sub(start);
+    const length = delta.length();
+    if (length <= 0.001) return;
+
+    const tracer = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.015, 0.015, length, 6),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9 }),
+    );
+    tracer.position.copy(start).addScaledVector(delta, 0.5);
+    tracer.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.normalize());
+    this.scene.add(tracer);
+    this.tracers.push({ mesh: tracer, life: 1.35, maxLife: 1.35 });
+  }
+
+  updateTracers(dt) {
+    for (let i = this.tracers.length - 1; i >= 0; i -= 1) {
+      const tracer = this.tracers[i];
+      tracer.life -= dt;
+      const alpha = clamp(tracer.life / tracer.maxLife, 0, 1);
+      tracer.mesh.material.opacity = alpha * alpha * 0.9;
+      if (tracer.life <= 0) {
+        this.scene.remove(tracer.mesh);
+        tracer.mesh.geometry.dispose();
+        tracer.mesh.material.dispose();
+        this.tracers.splice(i, 1);
       }
     }
   }
@@ -734,7 +797,7 @@ export class Game {
     const reloadTilt = this.weapon.reloadLeft > 0 ? 0.55 : 0;
 
     this.viewModel.position.y = -0.03 + recoil * 0.3;
-    this.weaponMesh.position.z = -0.72 + recoil;
+    this.weaponMesh.position.z = -0.77 + recoil;
     this.weaponMesh.rotation.x = -reloadTilt;
     this.leftForearm.rotation.z = -reloadTilt * 0.25;
     this.rightForearm.rotation.z = reloadTilt * 0.25;
