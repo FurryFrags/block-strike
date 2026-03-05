@@ -125,8 +125,8 @@ export class BotCharacter {
     this.rightLeg = rightLeg.pivot;
 
     this.gunMount = new THREE.Group();
-    this.gunMount.position.set(0.01, -0.28, -0.28);
-    this.gunMount.rotation.set(-0.2, 0.05, 0);
+    this.gunMount.position.set(0.02, -0.23, -0.36);
+    this.gunMount.rotation.set(0.14, 0.04, 0);
 
     this.gun = limb({ x: 0.1, y: 0.18, z: 0.54 }, '#212326');
     this.gun.position.set(0, -0.02, -0.08);
@@ -149,9 +149,9 @@ export class BotCharacter {
     const sway = Math.sin(time * 8 + this.walkPhase) * 0.55 * speedFactor;
     this.leftLeg.rotation.x = sway;
     this.rightLeg.rotation.x = -sway;
-    this.leftArm.rotation.x = -0.42 - sway * 0.35;
-    this.leftArm.rotation.z = -0.18;
-    this.rightArm.rotation.x = -0.56 + sway * 0.2;
-    this.rightArm.rotation.z = 0.05;
+    this.leftArm.rotation.x = 0.16 - sway * 0.45;
+    this.leftArm.rotation.z = 0;
+    this.rightArm.rotation.x = 0.42 + sway * 0.25;
+    this.rightArm.rotation.z = 0;
   }
 }
