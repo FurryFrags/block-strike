@@ -221,20 +221,29 @@ export class Game {
 
     this.playerBody = new THREE.Group();
 
-    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.62, 0.28), shirt);
-    torso.position.y = 1.42;
-    this.playerHead = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.34, 0.34), skin);
-    this.playerHead.position.y = 1.93;
+    const createPivotLimb = (size, material, pivotY) => {
+      const pivot = new THREE.Group();
+      pivot.position.y = pivotY;
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(size.x, size.y, size.z), material);
+      mesh.position.y = -size.y * 0.5;
+      pivot.add(mesh);
+      return pivot;
+    };
 
-    this.playerLeftArm = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.54, 0.16), shirt);
-    this.playerLeftArm.position.set(-0.36, 1.42, 0);
-    this.playerRightArm = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.54, 0.16), shirt);
-    this.playerRightArm.position.set(0.36, 1.42, 0);
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.72, 0.26), shirt);
+    torso.position.y = 1.45;
+    this.playerHead = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.42), skin);
+    this.playerHead.position.y = 2.02;
 
-    this.playerLeftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.62, 0.2), pants);
-    this.playerLeftLeg.position.set(-0.14, 0.8, 0);
-    this.playerRightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.62, 0.2), pants);
-    this.playerRightLeg.position.set(0.14, 0.8, 0);
+    this.playerLeftArm = createPivotLimb({ x: 0.16, y: 0.74, z: 0.16 }, shirt, 1.78);
+    this.playerLeftArm.position.x = -0.34;
+    this.playerRightArm = createPivotLimb({ x: 0.16, y: 0.74, z: 0.16 }, shirt, 1.78);
+    this.playerRightArm.position.x = 0.34;
+
+    this.playerLeftLeg = createPivotLimb({ x: 0.18, y: 0.72, z: 0.18 }, pants, 1.1);
+    this.playerLeftLeg.position.x = -0.13;
+    this.playerRightLeg = createPivotLimb({ x: 0.18, y: 0.72, z: 0.18 }, pants, 1.1);
+    this.playerRightLeg.position.x = 0.13;
 
     this.playerBody.add(
       torso,

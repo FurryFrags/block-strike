@@ -46,6 +46,17 @@ function limb(size, color) {
   return mesh;
 }
 
+function createPivotLimb(size, color, pivotY) {
+  const pivot = new THREE.Group();
+  pivot.position.y = pivotY;
+
+  const mesh = limb(size, color);
+  mesh.position.y = -size.y * 0.5;
+  pivot.add(mesh);
+
+  return { pivot, mesh };
+}
+
 const TEAM_PALETTES = {
   alpha: { torso: '#3b74a5', arms: '#2c5a82' },
   beta: { torso: '#a94d47', arms: '#853835' },
@@ -67,23 +78,29 @@ export class BotCharacter {
 
     const palette = TEAM_PALETTES[team] ?? TEAM_PALETTES.beta;
 
-    const torso = limb({ x: 0.54, y: 0.62, z: 0.28 }, palette.torso);
-    torso.position.y = 1.42;
-    const head = limb({ x: 0.34, y: 0.34, z: 0.34 }, '#e7b99a');
-    head.position.y = 1.93;
+    const torso = limb({ x: 0.52, y: 0.72, z: 0.26 }, palette.torso);
+    torso.position.y = 1.45;
+    const head = limb({ x: 0.42, y: 0.42, z: 0.42 }, '#e7b99a');
+    head.position.y = 2.02;
 
-    this.leftArm = limb({ x: 0.14, y: 0.54, z: 0.16 }, palette.arms);
-    this.leftArm.position.set(-0.36, 1.42, 0);
-    this.rightArm = limb({ x: 0.14, y: 0.54, z: 0.16 }, palette.arms);
-    this.rightArm.position.set(0.36, 1.42, 0);
+    const leftArm = createPivotLimb({ x: 0.16, y: 0.74, z: 0.16 }, palette.arms, 1.78);
+    leftArm.pivot.position.x = -0.34;
+    this.leftArm = leftArm.pivot;
 
-    this.leftLeg = limb({ x: 0.17, y: 0.62, z: 0.2 }, '#28313a');
-    this.leftLeg.position.set(-0.14, 0.8, 0);
-    this.rightLeg = limb({ x: 0.17, y: 0.62, z: 0.2 }, '#28313a');
-    this.rightLeg.position.set(0.14, 0.8, 0);
+    const rightArm = createPivotLimb({ x: 0.16, y: 0.74, z: 0.16 }, palette.arms, 1.78);
+    rightArm.pivot.position.x = 0.34;
+    this.rightArm = rightArm.pivot;
+
+    const leftLeg = createPivotLimb({ x: 0.18, y: 0.72, z: 0.18 }, '#28313a', 1.1);
+    leftLeg.pivot.position.x = -0.13;
+    this.leftLeg = leftLeg.pivot;
+
+    const rightLeg = createPivotLimb({ x: 0.18, y: 0.72, z: 0.18 }, '#28313a', 1.1);
+    rightLeg.pivot.position.x = 0.13;
+    this.rightLeg = rightLeg.pivot;
 
     this.gun = limb({ x: 0.1, y: 0.18, z: 0.54 }, '#212326');
-    this.gun.position.set(0.48, 1.33, 0.2);
+    this.gun.position.set(0.48, 1.42, 0.2);
     this.gun.rotation.x = Math.PI * 0.5;
 
     this.group.add(torso, head, this.leftArm, this.rightArm, this.leftLeg, this.rightLeg, this.gun);
