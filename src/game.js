@@ -450,8 +450,8 @@ export class Game {
     this.playerRightArm.position.x = 0.39;
 
     this.playerWeaponMount = new THREE.Group();
-    this.playerWeaponMount.position.set(0.02, -0.3, -0.28);
-    this.playerWeaponMount.rotation.set(-0.2, 0.05, 0);
+    this.playerWeaponMount.position.set(0.02, -0.23, -0.36);
+    this.playerWeaponMount.rotation.set(0.14, 0.04, 0);
     this.playerRightArm.add(this.playerWeaponMount);
 
     this.playerLeftLeg = createPivotLimb(MODEL.limb, pants, 1.1);
@@ -668,10 +668,10 @@ export class Game {
 
     this.playerLeftLeg.rotation.x = sway;
     this.playerRightLeg.rotation.x = -sway;
-    this.playerLeftArm.rotation.x = -0.32 - sway * 0.42;
-    this.playerLeftArm.rotation.z = -0.14;
-    this.playerRightArm.rotation.x = -0.58 + sway * 0.22;
-    this.playerRightArm.rotation.z = 0.08;
+    this.playerLeftArm.rotation.x = 0.16 - sway * 0.45;
+    this.playerLeftArm.rotation.z = 0;
+    this.playerRightArm.rotation.x = 0.42 + sway * 0.25;
+    this.playerRightArm.rotation.z = 0;
 
     const headYawOffset = this.perspectiveName === 'third-person-front' ? Math.PI : 0;
     const headYaw = headYawOffset;
