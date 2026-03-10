@@ -87,6 +87,15 @@ const TEAM_PALETTES = {
   beta: { torso: '#a94d47', arms: '#853835' },
 };
 
+const CHARACTER_POSE = {
+  armRestX: 0.32,
+  armRestZ: 0.08,
+  supportArmX: -0.46,
+  supportArmZ: -0.12,
+  legStride: 0.7,
+  weaponPitchMax: 0.85,
+};
+
 export class BotCharacter {
   constructor(x, z, team = 'beta') {
     this.group = new THREE.Group();
@@ -126,11 +135,11 @@ export class BotCharacter {
     this.rightLeg = rightLeg.pivot;
 
     this.gunMount = new THREE.Group();
-    this.gunMount.position.set(0.04, -0.21, -0.34);
-    this.gunMount.rotation.set(0.04, 0.02, -0.08);
+    this.gunMount.position.set(0.02, -0.36, -0.31);
+    this.gunMount.rotation.set(-0.02, 0.04, -0.02);
 
     this.gun = limb({ x: 0.1, y: 0.18, z: 0.54 }, '#212326');
-    this.gun.position.set(0, -0.02, -0.08);
+    this.gun.position.set(0, -0.01, -0.12);
     this.gun.rotation.x = Math.PI * 0.5;
 
     this.gunMuzzle = new THREE.Object3D();
@@ -146,15 +155,16 @@ export class BotCharacter {
     return this.hp > 0;
   }
 
-  animateWalk(time, speedFactor) {
-    const sway = Math.sin(time * 8 + this.walkPhase) * 0.55 * speedFactor;
+  animateWalk(time, speedFactor, aimPitch = 0) {
+    const sway = Math.sin(time * 8 + this.walkPhase) * CHARACTER_POSE.legStride * speedFactor;
     this.leftLeg.rotation.x = sway;
     this.rightLeg.rotation.x = -sway;
-    this.leftArm.rotation.x = 0.16 - sway * 0.45;
-    this.leftArm.rotation.z = 0;
+    this.leftArm.rotation.x = CHARACTER_POSE.supportArmX - sway * 0.25;
+    this.leftArm.rotation.z = CHARACTER_POSE.supportArmZ;
     const fireLift = this.firePose > 0 ? Math.min(1, this.firePose / 0.18) : 0;
-    this.rightArm.rotation.x = 0.42 + sway * 0.25 + fireLift * 1.2;
-    this.leftArm.rotation.x += fireLift * 0.36;
-    this.rightArm.rotation.z = 0;
+    const clampedAimPitch = Math.max(-CHARACTER_POSE.weaponPitchMax, Math.min(CHARACTER_POSE.weaponPitchMax, aimPitch));
+    this.rightArm.rotation.x = CHARACTER_POSE.armRestX + sway * 0.12 + fireLift * 0.28 - clampedAimPitch * 0.55;
+    this.leftArm.rotation.x += fireLift * 0.2 - clampedAimPitch * 0.25;
+    this.rightArm.rotation.z = CHARACTER_POSE.armRestZ;
   }
 }
