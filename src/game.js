@@ -246,6 +246,7 @@ export class Game {
     this.isPlayerGrounded = true;
     this.playerMoveAmount = 0;
     this.playerIsRunning = false;
+    this.playerFirePose = 0;
     this.playerWalkTime = Math.random() * Math.PI * 2;
 
     this.worldBlocks = [];
@@ -450,8 +451,8 @@ export class Game {
     this.playerRightArm.position.x = 0.39;
 
     this.playerWeaponMount = new THREE.Group();
-    this.playerWeaponMount.position.set(0.02, -0.23, -0.36);
-    this.playerWeaponMount.rotation.set(0.14, 0.04, 0);
+    this.playerWeaponMount.position.set(0.04, -0.21, -0.34);
+    this.playerWeaponMount.rotation.set(0.04, 0.02, -0.08);
     this.playerRightArm.add(this.playerWeaponMount);
 
     this.playerLeftLeg = createPivotLimb(MODEL.limb, pants, 1.1);
@@ -597,6 +598,7 @@ export class Game {
     this.damageFlash = Math.max(0, this.damageFlash - dt * 1.8);
     this.weapon.update(dt);
     this.grenadeState.update(dt);
+    this.playerFirePose = Math.max(0, this.playerFirePose - dt);
 
     this.updateLook();
     this.updateMovement(dt);
@@ -670,7 +672,9 @@ export class Game {
     this.playerRightLeg.rotation.x = -sway;
     this.playerLeftArm.rotation.x = 0.16 - sway * 0.45;
     this.playerLeftArm.rotation.z = 0;
-    this.playerRightArm.rotation.x = 0.42 + sway * 0.25;
+    const fireLift = this.playerFirePose > 0 ? Math.min(1, this.playerFirePose / 0.18) : 0;
+    this.playerRightArm.rotation.x = 0.42 + sway * 0.25 + fireLift * 1.2;
+    this.playerLeftArm.rotation.x += fireLift * 0.36;
     this.playerRightArm.rotation.z = 0;
 
     const headYawOffset = this.perspectiveName === 'third-person-front' ? Math.PI : 0;
@@ -698,6 +702,7 @@ export class Game {
 
   fireWeapon() {
     if (!this.weapon.fire()) return;
+    this.playerFirePose = 0.18;
 
     if (this.weapon.def.isMelee) {
       let closest = null;
@@ -762,6 +767,7 @@ export class Game {
       if (!target) continue;
       const d = dist2d(botPos.x, botPos.z, target.x, target.z);
       bot.attackCooldown = Math.max(0, bot.attackCooldown - dt);
+      bot.firePose = Math.max(0, (bot.firePose ?? 0) - dt);
 
       if (d < 24) {
         const targetAngle = Math.atan2(target.x - botPos.x, target.z - botPos.z);
@@ -786,6 +792,7 @@ export class Game {
           this.spawnTracer(muzzleOrigin, targetPoint, bot.team === 'alpha' ? '#b8d9ff' : '#ffb8b8');
           this.applyDamage(target, 8);
           bot.attackCooldown = 0.5 + Math.random() * 0.55;
+          bot.firePose = 0.18;
         }
       }
     }
