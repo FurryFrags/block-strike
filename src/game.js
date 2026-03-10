@@ -194,6 +194,13 @@ function applyPose(target, pose) {
   if (pose.scale) target.scale.setScalar(pose.scale);
 }
 
+function readTransform(target) {
+  return {
+    position: target.position.clone(),
+    rotation: target.rotation.clone(),
+  };
+}
+
 export class Game {
   constructor(canvas, hud, options = 0) {
     this.canvas = canvas;
@@ -391,6 +398,14 @@ export class Game {
     applyPose(this.weaponMesh, DEFAULT_VIEW_POSE.weapon);
 
     this.viewModel.add(this.leftForearm, this.leftHand, this.rightForearm, this.rightHand, this.weaponMesh);
+    this.viewAnimationBase = {
+      viewModelY: -0.03,
+      weapon: readTransform(this.weaponMesh),
+      leftForearm: readTransform(this.leftForearm),
+      rightForearm: readTransform(this.rightForearm),
+      leftHand: readTransform(this.leftHand),
+      rightHand: readTransform(this.rightHand),
+    };
   }
 
   syncWeaponModel() {
@@ -408,6 +423,15 @@ export class Game {
     applyPose(this.rightForearm, pose.rightForearm);
     applyPose(this.rightHand, pose.rightHand);
     applyPose(this.weaponMesh, pose.weapon);
+
+    this.viewAnimationBase = {
+      viewModelY: -0.03,
+      weapon: readTransform(this.weaponMesh),
+      leftForearm: readTransform(this.leftForearm),
+      rightForearm: readTransform(this.rightForearm),
+      leftHand: readTransform(this.leftHand),
+      rightHand: readTransform(this.rightHand),
+    };
 
     this.weaponMesh.clear();
     const model = createWeaponModel(weaponId);
@@ -892,12 +916,30 @@ export class Game {
   animateViewModel() {
     const recoil = (1 - this.weapon.cooldown * this.weapon.def.fireRate) * 0.08;
     const reloadTilt = this.weapon.reloadLeft > 0 ? 0.55 : 0;
+    const base = this.viewAnimationBase;
 
-    this.viewModel.position.y = -0.03 + recoil * 0.3;
-    this.weaponMesh.position.z = -0.77 + recoil;
-    this.weaponMesh.rotation.x = -reloadTilt;
-    this.leftForearm.rotation.z = -reloadTilt * 0.25;
-    this.rightForearm.rotation.z = reloadTilt * 0.25;
+    this.viewModel.position.y = base.viewModelY + recoil * 0.3;
+
+    this.weaponMesh.position.copy(base.weapon.position);
+    this.weaponMesh.position.z += recoil;
+    this.weaponMesh.rotation.copy(base.weapon.rotation);
+    this.weaponMesh.rotation.x -= reloadTilt;
+
+    this.leftForearm.position.copy(base.leftForearm.position);
+    this.leftForearm.rotation.copy(base.leftForearm.rotation);
+    this.leftForearm.rotation.z -= reloadTilt * 0.25;
+
+    this.rightForearm.position.copy(base.rightForearm.position);
+    this.rightForearm.rotation.copy(base.rightForearm.rotation);
+    this.rightForearm.rotation.z += reloadTilt * 0.25;
+
+    this.leftHand.position.copy(base.leftHand.position);
+    this.leftHand.rotation.copy(base.leftHand.rotation);
+    this.leftHand.rotation.z -= reloadTilt * 0.1;
+
+    this.rightHand.position.copy(base.rightHand.position);
+    this.rightHand.rotation.copy(base.rightHand.rotation);
+    this.rightHand.rotation.z += reloadTilt * 0.1;
 
     this.canvas.style.boxShadow = this.damageFlash > 0 ? `inset 0 0 120px rgba(255,0,0,${this.damageFlash * 0.45})` : 'none';
   }
