@@ -98,6 +98,7 @@ export class BotCharacter {
     this.speed = 2.2;
     this.hp = 100;
     this.attackCooldown = 0;
+    this.firePose = 0;
     this.verticalVelocity = 0;
     this.walkPhase = Math.random() * Math.PI * 2;
 
@@ -125,8 +126,8 @@ export class BotCharacter {
     this.rightLeg = rightLeg.pivot;
 
     this.gunMount = new THREE.Group();
-    this.gunMount.position.set(0.02, -0.23, -0.36);
-    this.gunMount.rotation.set(0.14, 0.04, 0);
+    this.gunMount.position.set(0.04, -0.21, -0.34);
+    this.gunMount.rotation.set(0.04, 0.02, -0.08);
 
     this.gun = limb({ x: 0.1, y: 0.18, z: 0.54 }, '#212326');
     this.gun.position.set(0, -0.02, -0.08);
@@ -151,7 +152,9 @@ export class BotCharacter {
     this.rightLeg.rotation.x = -sway;
     this.leftArm.rotation.x = 0.16 - sway * 0.45;
     this.leftArm.rotation.z = 0;
-    this.rightArm.rotation.x = 0.42 + sway * 0.25;
+    const fireLift = this.firePose > 0 ? Math.min(1, this.firePose / 0.18) : 0;
+    this.rightArm.rotation.x = 0.42 + sway * 0.25 + fireLift * 1.2;
+    this.leftArm.rotation.x += fireLift * 0.36;
     this.rightArm.rotation.z = 0;
   }
 }
