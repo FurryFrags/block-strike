@@ -18,6 +18,15 @@ const MODEL = {
   head: MC_PIXEL * 8 * 0.95,
 };
 
+const THIRD_PERSON_POSE = {
+  armRestX: 0.32,
+  armRestZ: 0.08,
+  supportArmX: -0.46,
+  supportArmZ: -0.12,
+  legStride: 0.7,
+  weaponPitchMax: 0.85,
+};
+
 function clamp(v, lo, hi) {
   return Math.min(hi, Math.max(lo, v));
 }
@@ -441,8 +450,8 @@ export class Game {
       this.playerWeaponMount.clear();
       const worldModel = createWeaponModel(weaponId, new THREE.MeshStandardMaterial({ color: '#1f2329', metalness: 0.45, roughness: 0.4 }));
       worldModel.scale.setScalar(0.95);
-      worldModel.position.set(0.02, 0.07, -0.2);
-      worldModel.rotation.set(0.15, 0.05, 0);
+      worldModel.position.set(0.03, -0.02, -0.24);
+      worldModel.rotation.set(0.06, 0.03, 0.01);
       applyPose(worldModel, pose.world);
       this.playerWeaponMount.add(worldModel);
     }
@@ -475,8 +484,8 @@ export class Game {
     this.playerRightArm.position.x = 0.39;
 
     this.playerWeaponMount = new THREE.Group();
-    this.playerWeaponMount.position.set(0.04, -0.21, -0.34);
-    this.playerWeaponMount.rotation.set(0.04, 0.02, -0.08);
+    this.playerWeaponMount.position.set(0.02, -0.36, -0.31);
+    this.playerWeaponMount.rotation.set(-0.02, 0.04, -0.02);
     this.playerRightArm.add(this.playerWeaponMount);
 
     this.playerLeftLeg = createPivotLimb(MODEL.limb, pants, 1.1);
@@ -690,21 +699,23 @@ export class Game {
   animatePlayerModel(dt) {
     this.playerWalkTime += dt * (this.playerIsRunning ? 12 : 8);
     const walkStrength = this.playerMoveAmount;
-    const sway = Math.sin(this.playerWalkTime) * 0.55 * walkStrength;
+    const sway = Math.sin(this.playerWalkTime) * THIRD_PERSON_POSE.legStride * walkStrength;
 
     this.playerLeftLeg.rotation.x = sway;
     this.playerRightLeg.rotation.x = -sway;
-    this.playerLeftArm.rotation.x = 0.16 - sway * 0.45;
-    this.playerLeftArm.rotation.z = 0;
+
+    const aimPitch = clamp(this.pitchPivot.rotation.x, -THIRD_PERSON_POSE.weaponPitchMax, THIRD_PERSON_POSE.weaponPitchMax);
     const fireLift = this.playerFirePose > 0 ? Math.min(1, this.playerFirePose / 0.18) : 0;
-    this.playerRightArm.rotation.x = 0.42 + sway * 0.25 + fireLift * 1.2;
-    this.playerLeftArm.rotation.x += fireLift * 0.36;
-    this.playerRightArm.rotation.z = 0;
+
+    this.playerLeftArm.rotation.x = THIRD_PERSON_POSE.supportArmX - sway * 0.25 - aimPitch * 0.25 + fireLift * 0.2;
+    this.playerLeftArm.rotation.z = THIRD_PERSON_POSE.supportArmZ;
+
+    this.playerRightArm.rotation.x = THIRD_PERSON_POSE.armRestX + sway * 0.12 - aimPitch * 0.55 + fireLift * 0.28;
+    this.playerRightArm.rotation.z = THIRD_PERSON_POSE.armRestZ;
 
     const headYawOffset = this.perspectiveName === 'third-person-front' ? Math.PI : 0;
-    const headYaw = headYawOffset;
     const pitchSign = this.perspectiveName === 'third-person-front' ? -1 : 1;
-    this.playerHead.rotation.y = headYaw;
+    this.playerHead.rotation.y = headYawOffset;
     this.playerHead.rotation.x = clamp(this.pitchPivot.rotation.x * pitchSign, -0.8, 0.8);
   }
 
@@ -804,7 +815,11 @@ export class Game {
           botPos.x = nx;
           botPos.z = nz;
         }
-        bot.animateWalk(performance.now() * 0.001, moveStep > 0 ? 1 : 0.2);
+        const localTargetY = target.type === 'player'
+          ? this.playerPos.y + PLAYER_HEAD_Y - 0.15
+          : 1.45;
+        const aimPitch = Math.atan2(localTargetY - (botPos.y + 1.45), Math.max(0.25, d));
+        bot.animateWalk(performance.now() * 0.001, moveStep > 0 ? 1 : 0.2, aimPitch);
 
         if (d < 9 && bot.attackCooldown === 0 && this.canSeeTarget(botPos, target)) {
           const muzzleOrigin = bot.gunMuzzle
