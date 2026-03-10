@@ -138,17 +138,25 @@ export class BotCharacter {
     this.gunMount.position.set(0.02, -0.36, -0.31);
     this.gunMount.rotation.set(-0.02, 0.04, -0.02);
 
-    this.gun = limb({ x: 0.1, y: 0.18, z: 0.54 }, '#212326');
-    this.gun.position.set(0, -0.01, -0.12);
-    this.gun.rotation.x = Math.PI * 0.5;
-
     this.gunMuzzle = new THREE.Object3D();
-    this.gunMuzzle.position.set(0, 0, -0.45);
+    this.gunMuzzle.position.set(0, 0.02, -0.98);
 
-    this.gunMount.add(this.gun, this.gunMuzzle);
+    this.gunMount.add(this.gunMuzzle);
     this.rightArm.add(this.gunMount);
 
     this.group.add(torso, head, this.leftArm, this.rightArm, this.leftLeg, this.rightLeg);
+  }
+
+  setWeaponModel(model, pose = null) {
+    if (!model) return;
+
+    this.gunMount.clear();
+    this.gunMount.add(model, this.gunMuzzle);
+
+    if (pose?.position) model.position.set(...pose.position);
+    if (pose?.rotation) model.rotation.set(...pose.rotation);
+    if (pose?.scale) model.scale.setScalar(pose.scale);
+    if (pose?.muzzle) this.gunMuzzle.position.set(...pose.muzzle);
   }
 
   get alive() {
